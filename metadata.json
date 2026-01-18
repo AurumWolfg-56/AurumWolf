@@ -1,0 +1,9 @@
+
+{
+  "name": "AurumWolf",
+  "description": "A Premium, Offline-First Finance PWA for high-net-worth individuals.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
