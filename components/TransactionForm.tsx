@@ -14,7 +14,7 @@ import { ReceiptReviewModal } from './ReceiptReviewModal';
 import { aiClient } from '../lib/ai/proxy';
 import { useCategories } from '../contexts/CategoryContext'; // Corrected import
 import { useBusiness } from '../contexts/BusinessContext'; // Needed for stores/channels
-import { useReceiptScanner } from '../hooks/useReceiptScanner';
+import { useReceiptScanner, ScannedReceiptData } from '../hooks/useReceiptScanner';
 
 interface TransactionFormProps {
   initialData?: Transaction | null;
@@ -47,7 +47,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
   const [description, setDescription] = useState(initialData?.description || '');
   const [merchant, setMerchant] = useState(initialData?.name || '');
   const [date, setDate] = useState(initialData?.date || new Date().toISOString().split('T')[0]);
-  const [type, setType] = useState<'income' | 'expense' | 'credit' | 'debit'>(initialData?.type || 'debit');
+  const [type, setType] = useState<'credit' | 'debit'>((initialData?.type as 'credit' | 'debit') || 'debit');
   const [category, setCategory] = useState(initialData?.category || '');
   const [selectedAccountId, setSelectedAccountId] = useState(initialData?.accountId || accounts[0]?.id || '');
 
@@ -66,23 +66,18 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
   const [businessEntityId, setBusinessEntityId] = useState(initialData?.business_id || '');
 
   const [isSplit, setIsSplit] = useState(!!initialData?.splits);
-  const [splits, setSplits] = useState<TransactionSplit[]>(initialData?.splits || []);
+  const [splits, setSplits] = useState<{ id: string | number; category: string; amount: string }[]>(
+    initialData?.splits?.map(s => ({ ...s, amount: s.amount.toString() })) || []
+  );
 
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
-  const [scannedData, setScannedData] = useState<Partial<Transaction> | null>(null);
+  const [scannedData, setScannedData] = useState<ScannedReceiptData | null>(null);
   const [scanPreview, setScanPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { isScanning, scanReceipt } = useReceiptScanner({
     onScanComplete: (data) => {
-      setScannedData({
-        name: data.merchant,
-        amount: data.amount?.toString(),
-        date: data.date,
-        category: data.category,
-        description: data.description,
-        currency: data.currency
-      });
+      setScannedData(data);
       setReviewModalOpen(true);
     }
   });
@@ -174,12 +169,13 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
     }
   };
 
-  const handleScanConfirm = (data: Partial<Transaction>) => {
-    if (data.amount) setAmount(data.amount.toString());
-    if (data.name) setMerchant(data.name);
+  const handleScanConfirm = (data: ScannedReceiptData) => {
+    if (data.amount !== undefined) setAmount(data.amount.toString());
+    if (data.merchant) setMerchant(data.merchant);
     if (data.date) setDate(data.date);
     if (data.category && categories.some(c => c.category === data.category)) setCategory(data.category);
     if (data.description) setDescription(data.description);
+    if (data.currency) setCurrency(data.currency);
     setReviewModalOpen(false);
     setScannedData(null);
   };
