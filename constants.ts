@@ -3,38 +3,19 @@ import { BusinessEntity, BudgetCategory, SavingsGoal, Investment, Account, Trans
 import {
   Wallet, Laptop, TrendingUp, Gift, Home, Crown, Clock, GraduationCap, RefreshCcw, Percent, Tag,
   Zap, ShoppingBasket, Utensils, Bus, Fuel, ShoppingBag, Film, Plane, Stethoscope, Package, Megaphone,
-  Trophy, Landmark, Car, Umbrella
+  Trophy, Landmark, Car, Umbrella, Repeat, Heart, Music, BookOpen, Coffee, Dumbbell, PawPrint,
+  Gamepad2, Smartphone, Monitor, Wrench, Scissors, Baby
 } from 'lucide-react';
 
 // --- INITIAL DATA SEEDS ---
 
-export const INITIAL_ACCOUNTS: Account[] = [
-  { id: '1', name: 'Platinum Checking', type: 'checking', balance: 24500.00, initialBalance: 11799.00, currency: 'USD', institution: 'Chase Private', color: 'bg-gradient-to-br from-neutral-800 to-neutral-900', last4: '8821', isFrozen: false },
-  { id: '2', name: 'Amex Centurion', type: 'credit', balance: -4250.00, initialBalance: 2335.00, currency: 'USD', institution: 'American Express', color: 'bg-gradient-to-br from-neutral-900 to-black', last4: '1005', isFrozen: false },
-  { id: '3', name: 'High Yield Savings', type: 'savings', balance: 150000.00, initialBalance: 105000.00, currency: 'USD', institution: 'Goldman Sachs', color: 'bg-gradient-to-br from-gold-600 to-gold-700', last4: '3320', isFrozen: false },
-  { id: '4', name: 'Ventures Capital', type: 'investment', balance: 85000.00, initialBalance: 83800.00, currency: 'USD', institution: 'Prelude Vault', color: 'bg-gradient-to-br from-blue-900 to-neutral-900', last4: '0099', isFrozen: false },
-  { id: '5', name: 'London Ops', type: 'checking', balance: 12500.00, initialBalance: 12500.00, currency: 'GBP', institution: 'Barclays', color: 'bg-gradient-to-br from-blue-800 to-blue-950', last4: '4421', isFrozen: false },
-  { id: '6', name: 'Cold Storage', type: 'crypto', balance: 1.45, initialBalance: 1.45, currency: 'BTC', institution: 'Ledger', color: 'bg-gradient-to-br from-orange-500 to-orange-700', last4: 'Wallet', isFrozen: true },
-];
+export const INITIAL_ACCOUNTS: Account[] = [];
 
-export const MOCK_TRANSACTIONS: Transaction[] = [
-  // Personal
-  { id: '101', accountId: '1', name: 'Apple Store', amount: '$2,499.00', numericAmount: 2499, currency: 'USD', date: '2023-10-24', category: 'Shopping', type: 'debit', status: 'completed' },
-  { id: '102', accountId: '2', name: 'Uber Premium', amount: '$45.00', numericAmount: 45, currency: 'USD', date: '2023-10-24', category: 'Transport', type: 'debit', status: 'completed' },
-  { id: '103', accountId: '1', name: 'Consulting Fee', amount: '$12,500.00', numericAmount: 12500, currency: 'USD', date: '2023-10-23', category: 'Freelance / Contract', type: 'credit', status: 'completed' },
-  { id: '104', accountId: '2', name: 'Nobu Downtown', amount: '$340.00', numericAmount: 340, currency: 'USD', date: '2023-10-22', category: 'Dining Out', type: 'debit', status: 'completed' },
-  { id: '107', accountId: '4', name: 'Stock Dividend', amount: '$1,200.00', numericAmount: 1200, currency: 'USD', date: '2023-10-15', category: 'Dividends', type: 'credit', status: 'completed' },
+export const MOCK_TRANSACTIONS: Transaction[] = []; // Cleared to prevent usage
 
-  // Business - NYC Store
-  { id: '201', accountId: '1', name: 'Daily Sales - NYC', amount: '$14,200.00', numericAmount: 14200, currency: 'USD', date: '2023-10-24', category: 'Sale', type: 'credit', status: 'completed', business_id: 'store_nyc' },
-  { id: '202', accountId: '1', name: 'NYC Rent', amount: '$8,000.00', numericAmount: 8000, currency: 'USD', date: '2023-10-01', category: 'Rent / Mortgage', type: 'debit', status: 'completed', business_id: 'store_nyc', isRecurring: true, recurringFrequency: 'monthly', nextRecurringDate: '2023-11-01' },
-  { id: '203', accountId: '1', name: 'Inventory Restock', amount: '$3,500.00', numericAmount: 3500, currency: 'USD', date: '2023-10-10', category: 'Business Inventory', type: 'debit', status: 'completed', business_id: 'store_nyc' },
+// Categories are now loaded dynamically via Context / DB
+export const CATEGORIES: BudgetCategory[] = [];
 
-  // Business - Online Global
-  { id: '301', accountId: '3', name: 'Stripe Payout', amount: '$45,000.00', numericAmount: 45000, currency: 'USD', date: '2023-10-22', category: 'Sale', type: 'credit', status: 'completed', business_id: 'online_global' },
-  { id: '302', accountId: '2', name: 'AWS Cloud', amount: '$1,200.00', numericAmount: 1200, currency: 'USD', date: '2023-10-21', category: 'Utilities', type: 'debit', status: 'completed', business_id: 'online_global', isRecurring: true, recurringFrequency: 'monthly', nextRecurringDate: '2023-11-21' },
-  { id: '303', accountId: '2', name: 'Meta Ads', amount: '$5,000.00', numericAmount: 5000, currency: 'USD', date: '2023-10-20', category: 'Business Marketing', type: 'debit', status: 'completed', business_id: 'online_global' },
-];
 
 // --- TRANSLATIONS ---
 export const TRANSLATIONS = {
@@ -58,6 +39,7 @@ export const TRANSLATIONS = {
       confirmDelete: 'Are you sure you want to delete this item?',
       all: 'All',
       back: 'Back',
+      view: 'View', // Added missing key
       submit: 'Submit',
       processing: 'Processing...',
       available: 'Available',
@@ -70,6 +52,12 @@ export const TRANSLATIONS = {
       email: 'Email',
       password: 'Password',
       fullName: 'Full Name',
+      frequencies: {
+        daily: 'Daily',
+        weekly: 'Weekly',
+        monthly: 'Monthly',
+        yearly: 'Yearly'
+      }
     },
     auth: {
       signIn: 'Sign In',
@@ -81,6 +69,7 @@ export const TRANSLATIONS = {
       signInDesc: 'Enter your credentials to access your wealth dashboard.',
       signUpDesc: 'Join the exclusive wealth management platform.',
       passPlaceholder: '••••••••',
+      biometricSignIn: 'Sign in with Biometrics',
     },
     nav: {
       dashboard: 'Dashboard',
@@ -93,6 +82,35 @@ export const TRANSLATIONS = {
       settings: 'Settings',
       newTransaction: 'New Transaction',
       scanr: 'Scan Receipt',
+      subtitle: 'Wealth Defined',
+    },
+    concierge: {
+      foundTransactions: 'Found {count} transactions matching your criteria.',
+      searching: 'Searching transactions...',
+      noResults: 'No transactions found matching your criteria.',
+      welcomeAttributes: 'Welcome to AurumWolf Concierge. Text me or tap the headphones for a voice call.',
+      contextBusiness: 'I see you are in the Business Hub. Would you like a P&L analysis or entity performance review?',
+      contextBudget: 'Reviewing your financial plan. You have some budget categories nearing their limit.',
+      contextAssets: 'Asset allocation mode active. I can assist with rebalancing strategies.',
+      contextPortfolio: 'Portfolio mode active. I can analyze your active vs. passive strategy positions.',
+      contextScan: 'Receipt scanner active. I will auto-extract data from any image you upload.',
+      contextGeneral: 'I have your full financial context. How may I assist you today?',
+      micErrorDenied: 'Microphone access denied. Please allow microphone permissions in your browser settings to use Voice Mode.',
+      micErrorNotFound: 'No microphone found. Please check your audio input device.',
+      micErrorUnknown: 'Voice Error',
+      addedVia: 'Added via Concierge',
+      transactionRecorded: 'Transaction recorded: {name} for {amount}.',
+      budgetCreated: 'Budget created: {category} with limit {limit}.',
+      processed: 'I processed that request.',
+      connectionError: 'Connection error.',
+      online: 'Online',
+      connecting: 'Connecting...',
+      listening: 'Listening...',
+      speaking: 'Speaking...',
+      voicePrompt: 'Ask me to add transactions, analyze spending, or check your budget.',
+      endCall: 'End Call',
+      startCall: 'Start Voice Call',
+      typeMessage: 'Type a message...',
     },
     titles: {
       dashboard: 'Dashboard',
@@ -125,7 +143,41 @@ export const TRANSLATIONS = {
       finHealthIndex: 'Financial Health Index',
       healthExcellent: 'Excellent. Your portfolio is well-diversified and liquid.',
       healthGood: 'Good. Consider reducing debt to improve score.',
+
       healthPoor: 'Attention needed. Review high-interest liabilities.',
+      thisMonth: 'This Month',
+      safeToSpend: 'Safe to Spend',
+      consumed: 'Consumed',
+      overBudget: 'Over Budget',
+      onTrack: 'On Track',
+      quickActions: 'Quick Actions',
+      savingsRadar: 'Savings Radar Active',
+      upcoming: 'Upcoming',
+      viewAll: 'View All',
+      autoPay: 'Auto-Pay',
+      payNow: 'Pay Now',
+      noBills: 'No upcoming bills.',
+      more: 'more',
+      less: 'less',
+      currency: 'Currency Converter',
+      scoreDetail: {
+        title: 'Aurum Score Breakdown',
+        description: 'A comprehensive measure of your financial hygiene.',
+        liquidity: 'Liquidity Ratio',
+        liquidityDesc: 'Cash / Monthly Expenses',
+        savings: 'Savings Rate',
+        savingsDesc: 'Net Cash Flow / Income',
+        debt: 'Debt-to-Asset',
+        debtDesc: 'Total Debt / Total Assets',
+        diversity: 'Diversity',
+        diversityDesc: 'Asset Class Spread',
+        pending: 'Pending Data',
+        pendingDesc: 'Add income and assets to generate score.',
+        excellent: 'Elite Financial Status',
+        good: 'Solid Foundation',
+        fair: 'Needs Optimization',
+        poor: 'Critical Attention Needed'
+      },
     },
     transactions: {
       income: 'Income',
@@ -183,7 +235,9 @@ export const TRANSLATIONS = {
         cash: 'Cash',
         crypto: 'Crypto Wallet',
         other: 'Other'
-      }
+      },
+      balanceAdjustment: 'Balance Adjustment',
+      startingBalance: 'Starting Balance',
     },
     budget: {
       netCashFlow: 'Net Cash Flow',
@@ -344,6 +398,9 @@ export const TRANSLATIONS = {
     },
     scan: {
       dragDrop: 'Drag & Drop Receipt',
+      tapDrop: 'Tap to Browse or Drop Receipt',
+      openCamera: 'Open Camera',
+      uploadFile: 'Upload File',
       orClick: 'or click to browse',
       supports: 'Supports PNG, JPG, PDF',
       scanning: 'Scanning Receipt...',
@@ -381,6 +438,52 @@ export const TRANSLATIONS = {
       editProfile: 'Edit Profile',
       premiumMember: 'Premium Member',
       earlyAccess: 'Early Access',
+      alertInvalidBackup: 'Invalid backup file: Data structure does not match expected format.',
+      alertRestoreWarning: 'Warning: Restoring will overwrite all current data. This action cannot be undone. Continue?',
+      alertRestoreSuccess: 'Restore successful. Reloading...',
+      alertParseError: 'Error parsing backup file. Please ensure it is a valid JSON.',
+      alertReconcileWarning: 'This will recalculate all account balances based on their initial snapshot and transaction history. This action cannot be undone. Proceed?',
+      alertReconcileSuccess: 'Balances reconciled successfully.',
+      termReconcile: 'Reconcile Balances',
+      termReconcileDesc: 'Recompute from transactions & initial snapshot',
+    },
+    transactionForm: {
+      titleNew: 'New Transaction',
+      titleEdit: 'Edit Transaction',
+      scanReceipt: 'Scan Receipt',
+      scanning: 'Scanning...',
+      expense: 'Expense',
+      income: 'Income',
+      amount: 'Amount',
+      rate: 'Rate',
+      settlement: 'Settlement',
+      chargeAccount: 'Charge Account',
+      merchantSource: 'Merchant / Source',
+      merchantPlaceholder: 'e.g. Starbucks, Uber, Salary',
+      findLocation: 'Find Location & Enrich',
+      locationFound: 'Location Found',
+      date: 'Date',
+      description: 'Description (Optional)',
+      descriptionPlaceholder: 'Add notes...',
+      splitTransaction: 'Split This Transaction',
+      splitTitle: 'Split Transaction',
+      reset: 'Reset',
+      addSplit: 'Add Split',
+      remaining: 'Remaining',
+      over: 'Over',
+      matched: 'Matched',
+      recurringPayment: 'Recurring Payment',
+      frequency: 'Frequency',
+      endDate: 'End Date',
+      businessExpense: 'Business Expense',
+      assignEntity: 'Assign Entity',
+      selectBusiness: 'Select Business Unit...',
+      delete: 'Delete',
+      cancel: 'Cancel',
+      update: 'Update Transaction',
+      add: 'Add Transaction',
+      selectCategory: 'Category...',
+      suggested: 'Suggested',
     }
   },
   es: {
@@ -403,6 +506,7 @@ export const TRANSLATIONS = {
       confirmDelete: '¿Estás seguro de que deseas eliminar este elemento?',
       all: 'Todos',
       back: 'Volver',
+      view: 'Ver', // Added missing key
       submit: 'Enviar',
       processing: 'Procesando...',
       available: 'Disponible',
@@ -415,6 +519,12 @@ export const TRANSLATIONS = {
       email: 'Correo Electrónico',
       password: 'Contraseña',
       fullName: 'Nombre Completo',
+      frequencies: {
+        daily: 'Diario',
+        weekly: 'Semanal',
+        monthly: 'Mensual',
+        yearly: 'Anual'
+      }
     },
     auth: {
       signIn: 'Iniciar Sesión',
@@ -426,6 +536,7 @@ export const TRANSLATIONS = {
       signInDesc: 'Ingresa tus credenciales para acceder a tu tablero.',
       signUpDesc: 'Únete a la plataforma exclusiva de gestión patrimonial.',
       passPlaceholder: '••••••••',
+      biometricSignIn: 'Iniciar con Biometría',
     },
     nav: {
       dashboard: 'Tablero',
@@ -438,6 +549,35 @@ export const TRANSLATIONS = {
       settings: 'Ajustes',
       newTransaction: 'Nueva Transacción',
       scanr: 'Escanear Recibo',
+      subtitle: 'Riqueza Definida',
+    },
+    concierge: {
+      foundTransactions: 'Encontradas {count} transacciones que coinciden con tu criterio.',
+      searching: 'Buscando transacciones...',
+      noResults: 'No se encontraron transacciones que coincidan con tu criterio.',
+      welcomeAttributes: 'Bienvenido a AurumWolf Concierge. Envíame un mensaje de texto o toca los auriculares para una llamada de voz.',
+      contextBusiness: 'Veo que estás en el Centro de Negocios. ¿Te gustaría un análisis de PyG o una revisión del rendimiento de la entidad?',
+      contextBudget: 'Revisando tu plan financiero. Tienes algunas categorías de presupuesto cerca de su límite.',
+      contextAssets: 'Modo de asignación de activos activo. Puedo ayudar con estrategias de rebalanceo.',
+      contextPortfolio: 'Modo de portafolio activo. Puedo analizar tus posiciones de estrategia activa vs. pasiva.',
+      contextScan: 'Escáner de recibos activo. Extraeré automáticamente los datos de cualquier imagen que subas.',
+      contextGeneral: 'Tengo tu contexto financiero completo. ¿Cómo puedo ayudarte hoy?',
+      micErrorDenied: 'Acceso al micrófono denegado. Por favor, permite el acceso al micrófono en la configuración de tu navegador para usar el Modo de Voz.',
+      micErrorNotFound: 'No se encontró micrófono. Por favor, verifica tu dispositivo de entrada de audio.',
+      micErrorUnknown: 'Error de Voz',
+      addedVia: 'Añadido vía Concierge',
+      transactionRecorded: 'Transacción registrada: {name} por {amount}.',
+      budgetCreated: 'Presupuesto creado: {category} con límite {limit}.',
+      processed: 'Procesé esa solicitud.',
+      connectionError: 'Error de conexión.',
+      online: 'En línea',
+      connecting: 'Conectando...',
+      listening: 'Escuchando...',
+      speaking: 'Hablando...',
+      voicePrompt: 'Pídeme añadir transacciones, analizar gastos o revisar tu presupuesto.',
+      endCall: 'Finalizar Llamada',
+      startCall: 'Iniciar Llamada de Voz',
+      typeMessage: 'Escribe un mensaje...',
     },
     titles: {
       dashboard: 'Tablero Principal',
@@ -470,7 +610,41 @@ export const TRANSLATIONS = {
       finHealthIndex: 'Índice de Salud Financiera',
       healthExcellent: 'Excelente. Tu portafolio está bien diversificado y líquido.',
       healthGood: 'Bueno. Considera reducir deudas para mejorar tu puntuación.',
+
       healthPoor: 'Atención requerida. Revisa pasivos de alto interés.',
+      thisMonth: 'Este Mes',
+      safeToSpend: 'Disponible para Gastar',
+      consumed: 'Consumido',
+      overBudget: 'Excedido',
+      onTrack: 'En camino',
+      quickActions: 'Acciones Rápidas',
+      savingsRadar: 'Radar de Ahorro Activo',
+      upcoming: 'Próximos',
+      viewAll: 'Ver Todo',
+      autoPay: 'Pago Automático',
+      payNow: 'Pagar Ahora',
+      noBills: 'Sin facturas próximas.',
+      more: 'más',
+      less: 'menos',
+      currency: 'Conversor Divisas',
+      scoreDetail: {
+        title: 'Desglose Aurum Score',
+        description: 'Una medida integral de tu higiene financiera.',
+        liquidity: 'Ratio de Liquidez',
+        liquidityDesc: 'Efectivo / Gastos Mensuales',
+        savings: 'Tasa de Ahorro',
+        savingsDesc: 'Flujo Neto / Ingresos',
+        debt: 'Deuda-Activo',
+        debtDesc: 'Deuda Total / Activos Totales',
+        diversity: 'Diversificación',
+        diversityDesc: 'Variedad de Activos',
+        pending: 'Datos Pendientes',
+        pendingDesc: 'Añade ingresos y activos para generar tu score.',
+        excellent: 'Estatus Financiero de Élite',
+        good: 'Fundación Sólida',
+        fair: 'Necesita Optimización',
+        poor: 'Atención Crítica Necesaria'
+      },
     },
     transactions: {
       income: 'Ingresos',
@@ -522,7 +696,9 @@ export const TRANSLATIONS = {
         cash: 'Efectivo',
         crypto: 'Crypto Wallet',
         other: 'Otro'
-      }
+      },
+      balanceAdjustment: 'Ajuste de Balance',
+      startingBalance: 'Balance Inicial',
     },
     budget: {
       netCashFlow: 'Flujo de Caja Neto',
@@ -716,6 +892,52 @@ export const TRANSLATIONS = {
       editProfile: 'Editar Perfil',
       premiumMember: 'Miembro Premium',
       earlyAccess: 'Acceso Anticipado',
+      alertInvalidBackup: 'Archivo de respaldo inválido: La estructura de datos no coincide con el formato esperado.',
+      alertRestoreWarning: 'Advertencia: La restauración sobrescribirá todos los datos actuales. Esta acción no se puede deshacer. ¿Continuar?',
+      alertRestoreSuccess: 'Restauración exitosa. Recargando...',
+      alertParseError: 'Error al analizar el archivo de respaldo. Asegúrese de que sea un JSON válido.',
+      alertReconcileWarning: 'Esto recalculará todos los saldos de cuenta basándose en su instantánea inicial y el historial de transacciones. Esta acción no se puede deshacer. ¿Proceder?',
+      alertReconcileSuccess: 'Saldos conciliados exitosamente.',
+      termReconcile: 'Conciliar Saldos',
+      termReconcileDesc: 'Recalcular desde transacciones e instantánea inicial',
+    },
+    transactionForm: {
+      titleNew: 'Nueva Transacción',
+      titleEdit: 'Editar Transacción',
+      scanReceipt: 'Escanear Recibo',
+      scanning: 'Escaneando...',
+      expense: 'Gasto',
+      income: 'Ingreso',
+      amount: 'Monto',
+      rate: 'Tasa',
+      settlement: 'Liquidación',
+      chargeAccount: 'Cuenta de Cargo',
+      merchantSource: 'Comercio / Fuente',
+      merchantPlaceholder: 'ej. Starbucks, Uber, Salario',
+      findLocation: 'Buscar Ubicación y Enriquecer',
+      locationFound: 'Ubicación Encontrada',
+      date: 'Fecha',
+      description: 'Descripción (Opcional)',
+      descriptionPlaceholder: 'Añadir notas...',
+      splitTransaction: 'Dividir esta Transacción',
+      splitTitle: 'Transacción Dividida',
+      reset: 'Reiniciar',
+      addSplit: 'Añadir División',
+      remaining: 'Restante',
+      over: 'Excedido',
+      matched: 'Coincide',
+      recurringPayment: 'Pago Recurrente',
+      frequency: 'Frecuencia',
+      endDate: 'Fecha Final',
+      businessExpense: 'Gasto de Negocio',
+      assignEntity: 'Asignar Entidad',
+      selectBusiness: 'Seleccionar Unidad de Negocio...',
+      delete: 'Eliminar',
+      cancel: 'Cancelar',
+      update: 'Actualizar Transacción',
+      add: 'Añadir Transacción',
+      selectCategory: 'Categoría...',
+      suggested: 'Sugerido',
     }
   }
 };
@@ -741,34 +963,7 @@ export const FX_RATES: Record<string, number> = {
 };
 
 // --- CATEGORY DEFINITIONS ---
-export const CATEGORIES = [
-  // INCOME
-  { id: 'salary', name: 'Salary / Wages', color: '#22C55E', icon: Wallet, type: 'income' },
-  { id: 'freelance', name: 'Freelance / Contract', color: '#16A34A', icon: Laptop, type: 'income' },
-  { id: 'dividends', name: 'Dividends / Returns', color: '#15803D', icon: TrendingUp, type: 'income' },
-  { id: 'bonus', name: 'Bonus / Awards', color: '#86EFAC', icon: Gift, type: 'income' },
-  { id: 'rental_income', name: 'Rental Income', color: '#4ADE80', icon: Home, type: 'income' },
-  { id: 'royalties', name: 'Royalties / Licensing', color: '#34D399', icon: Crown, type: 'income' },
-  { id: 'pension', name: 'Pension / Retirement', color: '#10B981', icon: Clock, type: 'income' },
-  { id: 'grants', name: 'Grants / Scholarships', color: '#059669', icon: GraduationCap, type: 'income' },
-  { id: 'refund', name: 'Refunds', color: '#BBF7D0', icon: RefreshCcw, type: 'income' },
-  { id: 'interest', name: 'Interest', color: '#10B981', icon: Percent, type: 'income' },
-  { id: 'sale', name: 'Sold Items', color: '#6EE7B7', icon: Tag, type: 'income' },
 
-  // EXPENSES
-  { id: 'rent_mortgage', name: 'Rent / Mortgage', color: '#8B5CF6', icon: Home, type: 'expense' },
-  { id: 'utilities', name: 'Utilities', color: '#A78BFA', icon: Zap, type: 'expense' },
-  { id: 'groceries', name: 'Groceries', color: '#F59E0B', icon: ShoppingBasket, type: 'expense' },
-  { id: 'dining', name: 'Dining Out', color: '#FBBF24', icon: Utensils, type: 'expense' },
-  { id: 'transport', name: 'Public Transport', color: '#F87171', icon: Bus, type: 'expense' },
-  { id: 'fuel', name: 'Fuel', color: '#EF4444', icon: Fuel, type: 'expense' },
-  { id: 'shopping', name: 'Shopping', color: '#EC4899', icon: ShoppingBag, type: 'expense' },
-  { id: 'entertainment', name: 'Entertainment', color: '#F472B6', icon: Film, type: 'expense' },
-  { id: 'travel', name: 'Travel', color: '#0EA5E9', icon: Plane, type: 'expense' },
-  { id: 'medical', name: 'Healthcare', color: '#14B8A6', icon: Stethoscope, type: 'expense' },
-  { id: 'inventory', name: 'Business Inventory', color: '#64748B', icon: Package, type: 'expense' },
-  { id: 'marketing', name: 'Business Marketing', color: '#94A3B8', icon: Megaphone, type: 'expense' },
-];
 
 // --- BUDGET MAPPING ---
 export const BUDGET_MAPPING: Record<string, string[]> = {
@@ -777,6 +972,7 @@ export const BUDGET_MAPPING: Record<string, string[]> = {
   'Shopping': ['Shopping', 'Clothing', 'Electronics', 'Apple Store'],
   'Travel': ['Travel', 'Transport', 'Fuel', 'Uber Premium', 'Airlines'],
   'Entertainment': ['Entertainment', 'Movies', 'Events'],
+  'Subscriptions': ['Netflix', 'Spotify', 'Hulu', 'Adobe', 'Service Subscription', 'Apple Services'],
   // Income
   'Salary / Wages': ['Salary', 'Wages', 'Paycheck'],
   'Freelance / Contract': ['Freelance', 'Contract', 'Consulting Fee'],

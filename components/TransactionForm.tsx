@@ -1,23 +1,20 @@
 
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
-  ArrowUpCircle, ArrowDownCircle, Check, X, Search, Split, Briefcase, Plus, Trash2, Store, Camera, Loader2, Sparkles, Tag, Lightbulb, Repeat, CalendarClock, CalendarOff, FileText, AlertCircle, RefreshCw, MapPin, ExternalLink
+  X, Check, Plus, Trash2, Repeat, Briefcase,
+  ArrowUpCircle, ArrowDownCircle, RefreshCw,
+  Wallet, CreditCard, PiggyBank, TrendingUp, Bitcoin,
+  Store, MapPin, Loader2, ExternalLink, FileText,
+  Lightbulb, Split, Camera
 } from 'lucide-react';
-import { GoogleGenAI, Type } from "@google/genai";
-import { Account, Transaction, TransactionSplit, RecurringFrequency } from '../types';
-import { CATEGORIES, CURRENCIES, FX_RATES } from '../constants';
-import { convertAmount } from '../lib/money';
-import { getLocalDateISO } from '../lib/dates';
+import { Account, Transaction, RecurringFrequency, TransactionSplit } from '../types';
+import { CURRENCIES } from '../constants';
 import { CategorySelect } from './CategorySelect';
-import { useReceiptScanner, ScannedReceiptData } from '../hooks/useReceiptScanner';
 import { ReceiptReviewModal } from './ReceiptReviewModal';
-import { useBusiness } from '../contexts/BusinessContext';
-
-// --- SUB-COMPONENTS ---
-
-// (SmartCategorySelect moved to ./CategorySelect.tsx)
-
-// --- MAIN FORM COMPONENT ---
+import { aiClient } from '../lib/ai/proxy';
+import { useCategories } from '../contexts/CategoryContext'; // Corrected import
+import { useBusiness } from '../contexts/BusinessContext'; // Needed for stores/channels
+import { useReceiptScanner } from '../hooks/useReceiptScanner';
 
 interface TransactionFormProps {
   initialData?: Transaction | null;
@@ -26,12 +23,7 @@ interface TransactionFormProps {
   onSave: (transaction: Transaction) => void;
   onDelete?: (id: string) => void;
   onCancel: () => void;
-}
-
-interface SplitItem {
-  id: number;
-  category: string;
-  amount: string;
+  t: (key: string) => string;
 }
 
 export const TransactionForm: React.FC<TransactionFormProps> = ({
@@ -40,233 +32,122 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
   transactions,
   onSave,
   onDelete,
-  onCancel
+  onCancel,
+  t
 }) => {
-  // --- CORE STATE ---
-  const { entities: businessEntities } = useBusiness();
-  const [selectedAccountId, setSelectedAccountId] = useState(accounts[0]?.id || '');
+  const { categories } = useCategories();
+  const { entities: businessEntities } = useBusiness(); // Fetch entities for dropdown
+
+  // State Declarations (restoring what might have been lost or ensuring it exists)
+  const [amount, setAmount] = useState(
+    initialData?.numericAmount !== undefined
+      ? initialData.numericAmount.toString()
+      : (initialData?.amount ? initialData.amount.replace(/[^0-9.]/g, '') : '')
+  );
+  const [description, setDescription] = useState(initialData?.description || '');
+  const [merchant, setMerchant] = useState(initialData?.name || '');
+  const [date, setDate] = useState(initialData?.date || new Date().toISOString().split('T')[0]);
+  const [type, setType] = useState<'income' | 'expense' | 'credit' | 'debit'>(initialData?.type || 'debit');
+  const [category, setCategory] = useState(initialData?.category || '');
+  const [selectedAccountId, setSelectedAccountId] = useState(initialData?.accountId || accounts[0]?.id || '');
+
   const selectedAccount = accounts.find(a => a.id === selectedAccountId);
 
-  // FX State
-  const [amount, setAmount] = useState(''); // Raw input
-  const [currency, setCurrency] = useState('USD'); // Transaction Currency
-  const [exchangeRate, setExchangeRate] = useState<number>(1);
-  const [manualRate, setManualRate] = useState(false);
+  // Additional State
+  const [currency, setCurrency] = useState(initialData?.currency || selectedAccount?.currency || 'USD');
+  const [exchangeRate, setExchangeRate] = useState(initialData?.exchangeRate || 1);
+  const [manualRate, setManualRate] = useState(!!initialData?.exchangeRate); // If editing and had rate, assume manual or fetched
 
-  const [type, setType] = useState<'credit' | 'debit'>('debit');
-  const [merchant, setMerchant] = useState('');
-  const [description, setDescription] = useState('');
-  const [category, setCategory] = useState('');
+  const [isRecurring, setIsRecurring] = useState(initialData?.isRecurring || false);
+  const [frequency, setFrequency] = useState<RecurringFrequency>(initialData?.recurringFrequency || 'monthly');
+  const [recurringEndDate, setRecurringEndDate] = useState(initialData?.recurringEndDate || '');
 
+  const [isBusiness, setIsBusiness] = useState(!!initialData?.business_id);
+  const [businessEntityId, setBusinessEntityId] = useState(initialData?.business_id || '');
 
-  const [date, setDate] = useState(getLocalDateISO());
+  const [isSplit, setIsSplit] = useState(!!initialData?.splits);
+  const [splits, setSplits] = useState<TransactionSplit[]>(initialData?.splits || []);
 
-  // Logic State
-  const [isBusiness, setIsBusiness] = useState(false);
-  const [businessEntityId, setBusinessEntityId] = useState('');
-  const [isSplit, setIsSplit] = useState(false);
-  const [splits, setSplits] = useState<SplitItem[]>([
-    { id: 1, category: '', amount: '' },
-    { id: 2, category: '', amount: '' }
-  ]);
-  const [isRecurring, setIsRecurring] = useState(false);
-  const [frequency, setFrequency] = useState<RecurringFrequency>('monthly');
-  const [recurringEndDate, setRecurringEndDate] = useState('');
-
-  // UI State
-  const [isLocating, setIsLocating] = useState(false);
-  const [locationFound, setLocationFound] = useState<{ address: string, uri: string } | null>(null);
-  const [suggestedCategory, setSuggestedCategory] = useState<string | null>(null);
-  const [isDescFocused, setIsDescFocused] = useState(false);
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [scannedData, setScannedData] = useState<Partial<Transaction> | null>(null);
+  const [scanPreview, setScanPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // New Scanner Hook & Modal State
-  const [scannedData, setScannedData] = useState<ScannedReceiptData | null>(null);
-  const [reviewModalOpen, setReviewModalOpen] = useState(false);
-  const [scanPreview, setScanPreview] = useState<string | null>(null);
-
-  const { isScanning, scanReceipt, error: scanError } = useReceiptScanner({
-    apiKey: import.meta.env.VITE_GEMINI_API_KEY,
+  const { isScanning, scanReceipt } = useReceiptScanner({
     onScanComplete: (data) => {
-      setScannedData(data);
+      setScannedData({
+        name: data.merchant,
+        amount: data.amount?.toString(),
+        date: data.date,
+        category: data.category,
+        description: data.description,
+        currency: data.currency
+      });
       setReviewModalOpen(true);
     }
   });
 
-  const handleScanConfirm = (data: ScannedReceiptData) => {
-    if (data.amount) setAmount(data.amount.toString());
-    if (data.currency) {
-      const supported = CURRENCIES.find(c => c.code === data.currency);
-      if (supported) setCurrency(data.currency);
-    }
-    if (data.merchant) setMerchant(data.merchant);
-    if (data.date) setDate(data.date);
-    if (data.category) setCategory(data.category);
-    if (data.description) setDescription(data.description);
+  const [isLocating, setIsLocating] = useState(false);
+  const [locationFound, setLocationFound] = useState<{ address: string, uri: string } | null>(null);
+  const [suggestedCategory, setSuggestedCategory] = useState<string | null>(null);
+  const [isDescFocused, setIsDescFocused] = useState(false);
 
-    // Clear preview
-    setScanPreview(null);
-  };
+  // Derived
+  const numericRawAmount = parseFloat(amount) || 0;
+  const settlementAmount = currency === selectedAccount?.currency
+    ? numericRawAmount
+    : numericRawAmount * exchangeRate; // Simplified logic, real app might be divide/multiply based on direction
 
+  const totalSplitAmount = splits.reduce((sum, s) => sum + (parseFloat(s.amount) || 0), 0);
+  const remainingSplit = numericRawAmount - totalSplitAmount;
+  const isSplitValid = !isSplit || Math.abs(remainingSplit) < 0.01;
 
-  // --- INITIALIZATION ---
+  // Effects
   useEffect(() => {
-    if (initialData) {
-      // Editing Mode
-      setAmount(initialData.foreignAmount ? initialData.foreignAmount.toString() : initialData.numericAmount.toString());
-      setCurrency(initialData.currency);
-      setType(initialData.type);
-      setMerchant(initialData.name);
-      setDescription(initialData.description || '');
-      // Safer date initialization
-      setDate(initialData.date || new Date().toISOString().split('T')[0]);
-      setSelectedAccountId(initialData.accountId);
-      setExchangeRate(initialData.exchangeRate || 1);
-      setManualRate(true); // Lock rate to prevent auto-recalc on edit unless changed manually
-
-      if (initialData.splits && initialData.splits.length > 0) {
-        setIsSplit(true);
-        setSplits(initialData.splits.map(s => ({
-          id: typeof s.id === 'string' ? parseInt(s.id) : s.id,
-          category: s.category,
-          amount: s.amount.toString()
-        })));
-      } else {
-        setCategory(initialData.category);
-      }
-
-      if (initialData.business_id) {
-        setIsBusiness(true);
-        setBusinessEntityId(initialData.business_id);
-      }
-
-      if (initialData.isRecurring) {
-        setIsRecurring(true);
-        if (initialData.recurringFrequency) setFrequency(initialData.recurringFrequency);
-        if (initialData.recurringEndDate) setRecurringEndDate(initialData.recurringEndDate);
-      }
-    } else {
-      // New Mode: Default currency to account currency
-      if (selectedAccount) {
-        setCurrency(selectedAccount.currency);
-      }
-    }
-  }, [initialData]);
-
-  // --- FX RATE CALCULATION ---
-  useEffect(() => {
-    // If manually set, don't overwrite unless account changes radically or it's new
-    if (manualRate) return;
-    if (!selectedAccount) return;
-
-    if (currency === selectedAccount.currency) {
-      setExchangeRate(1);
-    } else {
-      // Calculate Rate: How much AccountCurrency is 1 TxCurrency?
-      const calculatedAmount = convertAmount(1, currency, selectedAccount.currency);
-      setExchangeRate(parseFloat(calculatedAmount.toFixed(4)));
-    }
-  }, [currency, selectedAccountId, manualRate]); // Recalc when currency or account changes
-
-  // Update currency default when account changes (only if amount is empty to prevent user frustration)
-  useEffect(() => {
-    if (!initialData && !amount && selectedAccount) {
-      setCurrency(selectedAccount.currency);
-    }
-  }, [selectedAccountId]);
-
-  // --- SMART BUSINESS TOGGLE ---
-  // Automatically toggle 'Business Expense' if the selected account is a Business Account
-  useEffect(() => {
-    if (!initialData && selectedAccount) {
-      if (selectedAccount.linked_business_id) {
-        // Priority 1: Direct Link
-        setIsBusiness(true);
-        setBusinessEntityId(selectedAccount.linked_business_id);
-      } else if (selectedAccount.type === 'business') {
-        // Priority 2: Account Type Hint
-        setIsBusiness(true);
-        // Leave ID empty to force user selection, or could default to first?
-      } else {
-        setIsBusiness(false);
-        setBusinessEntityId('');
-      }
-    }
-  }, [selectedAccountId]);
+    if (!selectedAccountId && accounts.length > 0) setSelectedAccountId(accounts[0].id);
+  }, [accounts, selectedAccountId]);
 
 
-  // --- COMPUTED VALUES ---
-  const cleanAmountString = amount.replace(/[^0-9.]/g, ''); // Remove currency symbols if user typed them
-  const numericRawAmount = parseFloat(cleanAmountString) || 0;
-
-  // Settlement Amount = The amount hitting the account
-  const settlementAmount = numericRawAmount * exchangeRate;
-
-  // Split Logic (Splits must sum to the Raw Amount usually, or Settlement? Usually Raw)
-  // Let's assume splits are defined in Transaction Currency (Foreign)
-  const currentSplitTotal = splits.reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
-  const remainingSplit = numericRawAmount - currentSplitTotal;
-  // Valid if remaining split is close to 0 OR if we are not in split mode
-  const isSplitValid = isSplit ? Math.abs(remainingSplit) < 0.05 : true;
-
-  // --- AI RECEIPT SCANNING ---
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Create preview URL
-    const previewUrl = URL.createObjectURL(file);
-    setScanPreview(previewUrl);
-
-    // Call Hook
-    await scanReceipt(file);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
-  // --- MERCHANT ENRICHMENT (MAPS GROUNDING) ---
   const handleEnrichMerchant = async () => {
-    if (!merchant || !import.meta.env.VITE_GEMINI_API_KEY) return;
+    if (!merchant) return;
     setIsLocating(true);
     setLocationFound(null);
+    setSuggestedCategory(null);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-      // Using gemini-2.5-flash for Maps Grounding support
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: `Locate this merchant: "${merchant}". Return the official address, full business name, and a suggested transaction category from this list: ${CATEGORIES.map(c => c.name).join(', ')}.`,
-        config: {
-          tools: [{ googleMaps: {} }],
+      const response = await aiClient.generateContent(
+        'gemini-2.0-flash-exp',
+        [{
+          role: 'user',
+          parts: [{ text: `Locate this merchant: "${merchant}". Return the official address, full business name, and a suggested transaction category from this list: ${categories.map(c => c.category).join(', ')}.` }]
+        }],
+        {
+          tools: [{ google_search_retrieval: { dynamic_retrieval_config: { mode: "MODE_DYNAMIC", dynamic_threshold: 0.3 } } }],
         }
-      });
+      );
 
-      // Process Grounding chunks for Maps URI
-      const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-      const mapChunk = groundingChunks.find(c => c.web?.uri?.includes('google.com/maps') || (c as any).maps); // Check for map data
-
-      // Simple extraction of text response since Maps grounding response is text-heavy + metadata
-      const text = response.text || '';
-
-      // Extract address from text using regex heuristic or relying on the model's description in text
-      // Note: The model usually returns "I found [Merchant] at [Address]."
-      // We will put the whole text summary in the description if it's not too long.
-      setDescription(prev => prev ? `${prev}\n\n${text}` : text);
+      const text = response.text();
+      // Try to find grounding metadata for maps/links
+      const grounding = response.raw?.candidates?.[0]?.groundingMetadata;
+      const mapChunk = grounding?.searchEntryPoint; // Simplified access
 
       // Attempt to extract category if model mentioned one
-      const matchedCategory = CATEGORIES.find(c => text.includes(c.name));
+      const matchedCategory = categories.find(c => text.includes(c.category));
       if (matchedCategory && !category) {
-        setCategory(matchedCategory.name);
-        setSuggestedCategory(matchedCategory.name);
+        setCategory(matchedCategory.category);
+        setSuggestedCategory(matchedCategory.category);
       }
 
-      // Check for Map Link
+      // Check for Map Link (Grounding)
       let mapUri = '';
-      if (mapChunk && mapChunk.web && mapChunk.web.uri) {
-        mapUri = mapChunk.web.uri;
+      if (grounding?.groundingChunks?.[0]?.web?.uri) {
+        mapUri = grounding.groundingChunks[0].web.uri;
       }
 
-      if (mapUri) {
-        setLocationFound({ address: 'Location Data Added', uri: mapUri });
+      if (text) {
+        // Using the text as address for now if structured data isn't parsed
+        const firstLine = text.split('\n')[0];
+        setLocationFound({ address: firstLine.substring(0, 50) + (firstLine.length > 50 ? '...' : ''), uri: mapUri || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(merchant)}` });
       }
 
     } catch (error) {
@@ -285,11 +166,29 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
     return d.toISOString().split('T')[0];
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setScanPreview(URL.createObjectURL(file));
+      scanReceipt(file);
+    }
+  };
+
+  const handleScanConfirm = (data: Partial<Transaction>) => {
+    if (data.amount) setAmount(data.amount.toString());
+    if (data.name) setMerchant(data.name);
+    if (data.date) setDate(data.date);
+    if (data.category && categories.some(c => c.category === data.category)) setCategory(data.category);
+    if (data.description) setDescription(data.description);
+    setReviewModalOpen(false);
+    setScannedData(null);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!amount || !merchant) return;
     if (isSplit && !isSplitValid) {
-      alert("Split amounts must equal the total transaction amount.");
+      alert(t('transactionForm.splitError') || "Split amounts must equal the total transaction amount.");
       return;
     }
 
@@ -340,7 +239,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
     e.preventDefault();
     // Ensure we have an ID and the handler
     if (initialData && initialData.id && onDelete) {
-      if (window.confirm("Are you sure you want to delete this transaction? This action cannot be undone.")) {
+      if (window.confirm(t('common.confirmDelete'))) {
         // Explicitly cast to Number to match interface and store
         onDelete(initialData.id);
       }
@@ -366,7 +265,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <h2 className="text-2xl font-display font-bold text-neutral-900 dark:text-white">
-          {initialData ? 'Edit Transaction' : 'New Transaction'}
+          {initialData ? t('transactionForm.titleEdit') : t('transactionForm.titleNew')}
         </h2>
         <div className="flex gap-2">
           {!initialData && (
@@ -378,7 +277,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                 className="p-2 px-4 rounded-full bg-gold-500 hover:bg-gold-400 text-neutral-950 font-bold transition-all flex items-center gap-2 shadow-lg"
               >
                 {isScanning ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />}
-                <span className="hidden md:inline">{isScanning ? 'Scanning...' : 'Scan Receipt'}</span>
+                <span className="hidden md:inline">{isScanning ? t('transactionForm.scanning') : t('transactionForm.scanReceipt')}</span>
               </button>
               <input
                 type="file"
@@ -393,7 +292,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
           <button
             type="button"
             onClick={onCancel}
-            className="p-2 rounded-full bg-neutral-900 border border-neutral-800 text-neutral-400 hover:text-white transition-colors"
+            className="p-2 rounded-full bg-platinum-100 dark:bg-neutral-900 border border-platinum-200 dark:border-neutral-800 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors"
           >
             <X size={20} />
           </button>
@@ -413,7 +312,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
               }`}
           >
             <ArrowUpCircle size={18} className={type === 'debit' ? 'text-red-500' : ''} />
-            Expense
+            {t('transactionForm.expense')}
           </button>
           <button
             type="button"
@@ -424,13 +323,13 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
               }`}
           >
             <ArrowDownCircle size={18} className={type === 'credit' ? 'text-green-500' : ''} />
-            Income
+            {t('transactionForm.income')}
           </button>
         </div>
 
         {/* 2. Amount Input & Currency */}
         <div className="relative">
-          <label className="block text-xs font-bold text-neutral-500 mb-2 uppercase tracking-wider text-center">Amount</label>
+          <label className="block text-xs font-bold text-neutral-500 mb-2 uppercase tracking-wider">{t('transactionForm.amount')}</label>
           <div className="flex items-center justify-center gap-2">
             {/* Currency Selector */}
             <div className="relative">
@@ -460,7 +359,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
             <div className="mt-4 flex flex-col items-center justify-center animate-fade-in">
               <div className="flex items-center gap-3 px-4 py-2 bg-platinum-100 dark:bg-neutral-900 rounded-xl border border-platinum-200 dark:border-neutral-800">
                 <div className="text-right">
-                  <p className="text-[10px] text-neutral-500 uppercase font-bold">Rate</p>
+                  <p className="text-[10px] text-neutral-500 uppercase font-bold">{t('transactionForm.rate')}</p>
                   <input
                     type="number"
                     value={exchangeRate}
@@ -470,7 +369,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                 </div>
                 <RefreshCw size={14} className="text-neutral-400 dark:text-neutral-600" />
                 <div className="text-left">
-                  <p className="text-[10px] text-neutral-500 uppercase font-bold">Settlement ({selectedAccount?.currency})</p>
+                  <p className="text-[10px] text-neutral-500 uppercase font-bold">{t('transactionForm.settlement')} ({selectedAccount?.currency})</p>
                   <p className="text-sm text-neutral-900 dark:text-white font-bold font-mono">
                     {new Intl.NumberFormat('en-US', { style: 'currency', currency: selectedAccount?.currency || 'USD' }).format(settlementAmount)}
                   </p>
@@ -482,29 +381,53 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
 
         {/* 3. Account Selector */}
         <div className="bg-platinum-50 dark:bg-neutral-900/50 p-4 rounded-xl border border-platinum-200 dark:border-neutral-800 flex flex-col gap-3">
-          <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider">Charge Account</label>
+          <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider">{t('transactionForm.chargeAccount')}</label>
           <div className="flex gap-3 overflow-x-auto pb-2 custom-scrollbar">
-            {accounts.map(acc => (
-              <button
-                key={acc.id}
-                type="button"
-                onClick={() => { setSelectedAccountId(acc.id); setManualRate(false); }}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all shrink-0 ${selectedAccountId === acc.id
-                  ? 'bg-platinum-100 dark:bg-neutral-800 border-gold-500/50 shadow-[0_0_10px_rgba(212,175,55,0.1)]'
-                  : 'bg-white dark:bg-neutral-950 border-platinum-200 dark:border-neutral-800 opacity-60 hover:opacity-100'
-                  }`}
-              >
-                <div className={`w-3 h-3 rounded-full ${acc.type === 'credit' ? 'bg-purple-500' :
-                  acc.type === 'business' ? 'bg-gold-500' : 'bg-emerald-500'
-                  }`}></div>
-                <div className="text-left">
-                  <p className={`text-sm font-bold ${selectedAccountId === acc.id ? 'text-neutral-900 dark:text-white' : 'text-neutral-500 dark:text-neutral-400'}`}>{acc.name}</p>
-                  <p className="text-[10px] text-neutral-500 font-mono">
-                    •••• {acc.last4 || 'CASH'} <span className="text-gold-500/50">({acc.currency})</span>
-                  </p>
-                </div>
-              </button>
-            ))}
+            {accounts.map(acc => {
+              // Map Account Type to Icon
+              let TypeIcon = Wallet;
+              if (acc.type === 'credit') TypeIcon = CreditCard;
+              else if (acc.type === 'business') TypeIcon = Briefcase;
+              else if (acc.type === 'savings') TypeIcon = PiggyBank;
+              else if (acc.type === 'investment') TypeIcon = TrendingUp;
+              else if (acc.type === 'crypto') TypeIcon = Bitcoin;
+
+              return (
+                <button
+                  key={acc.id}
+                  type="button"
+                  onClick={() => { setSelectedAccountId(acc.id); setManualRate(false); }}
+                  className={`relative flex flex-col justify-between p-4 rounded-2xl border transition-all shrink-0 w-44 h-28 overflow-hidden group ${selectedAccountId === acc.id
+                    ? 'shadow-xl scale-105 ring-2 ring-offset-2 ring-gold-500 dark:ring-offset-neutral-950'
+                    : 'opacity-70 hover:opacity-100 hover:scale-[1.02]'
+                    } ${acc.color && acc.color.includes('gradient') ? acc.color : 'bg-neutral-900'}`}
+                  style={!acc.color?.includes('gradient') && acc.color ? { backgroundColor: acc.color } : {}}
+                >
+                  {/* Card Visuals */}
+                  {selectedAccountId !== acc.id && <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors z-10" />}
+
+                  {/* Top Row: Icon & Institution */}
+                  <div className="flex justify-between items-start z-0 text-white/90">
+                    <TypeIcon size={18} className="drop-shadow-md" />
+                    <span className="text-[10px] font-bold uppercase tracking-wider opacity-80">{acc.institution || 'Bank'}</span>
+                  </div>
+
+                  {/* Bottom Row: Name & Balance */}
+                  <div className="text-left z-0 text-white">
+                    <p className="text-xs font-medium opacity-90 truncate">{acc.name}</p>
+                    <p className="text-[10px] font-mono opacity-70">•••• {acc.last4 || '****'}</p>
+                    {selectedAccountId === acc.id && (
+                      <div className="absolute top-2 right-2 w-5 h-5 bg-white text-gold-600 rounded-full flex items-center justify-center shadow-lg animate-fade-in">
+                        <Check size={12} strokeWidth={4} />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Decorative Circle */}
+                  <div className="absolute -bottom-4 -right-4 w-20 h-20 bg-white/10 rounded-full blur-xl pointer-events-none"></div>
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -512,7 +435,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Merchant Name with Enrichment */}
           <div>
-            <label className="block text-xs font-bold text-neutral-500 mb-1.5 uppercase tracking-wider">Merchant / Source</label>
+            <label className="block text-xs font-bold text-neutral-500 mb-1.5 uppercase tracking-wider">{t('transactionForm.merchantSource')}</label>
             <div className="relative flex gap-2">
               <div className="relative group flex-1">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -522,7 +445,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                   type="text"
                   value={merchant}
                   onChange={(e) => setMerchant(e.target.value)}
-                  placeholder="e.g. Starbucks, Uber, Salary"
+                  placeholder={t('transactionForm.merchantPlaceholder')}
                   className="w-full bg-white dark:bg-neutral-900 border border-platinum-200 dark:border-neutral-800 text-neutral-900 dark:text-white text-sm rounded-xl focus:ring-1 focus:ring-gold-500 focus:border-gold-500 block pl-11 p-3 transition-all outline-none"
                 />
               </div>
@@ -532,21 +455,21 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                 onClick={handleEnrichMerchant}
                 disabled={!merchant || isLocating}
                 className="p-3 rounded-xl bg-white dark:bg-neutral-900 border border-platinum-200 dark:border-neutral-800 text-gold-500 hover:bg-gold-500/10 hover:border-gold-500 transition-all disabled:opacity-50"
-                title="Find Location & Enrich"
+                title={t('transactionForm.findLocation')}
               >
                 {isLocating ? <Loader2 size={18} className="animate-spin" /> : <MapPin size={18} />}
               </button>
             </div>
             {locationFound && (
               <a href={locationFound.uri} target="_blank" rel="noreferrer" className="mt-2 text-[10px] text-green-500 flex items-center gap-1 hover:underline">
-                <Check size={10} /> Location Found <ExternalLink size={8} />
+                <Check size={10} /> {t('transactionForm.locationFound')} <ExternalLink size={8} />
               </a>
             )}
           </div>
 
           {/* Date Picker */}
           <div>
-            <label className="block text-xs font-bold text-neutral-500 mb-1.5 uppercase tracking-wider">Date</label>
+            <label className="block text-xs font-bold text-neutral-500 mb-1.5 uppercase tracking-wider">{t('transactionForm.date')}</label>
             <div className="relative group">
               <input
                 type="date"
@@ -562,7 +485,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
 
         {/* Description Field */}
         <div className="relative z-20">
-          <label className="block text-xs font-bold text-neutral-500 mb-1.5 uppercase tracking-wider">Description (Optional)</label>
+          <label className="block text-xs font-bold text-neutral-500 mb-1.5 uppercase tracking-wider">{t('transactionForm.description')}</label>
           <div className="relative group">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
               <FileText size={16} className="text-neutral-500 group-focus-within:text-gold-500 transition-colors" />
@@ -572,7 +495,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
               onChange={(e) => setDescription(e.target.value)}
               onFocus={() => setIsDescFocused(true)}
               onBlur={() => setTimeout(() => setIsDescFocused(false), 200)}
-              placeholder="Add notes..."
+              placeholder={t('transactionForm.descriptionPlaceholder')}
               rows={2}
               className="w-full bg-white dark:bg-neutral-900 border border-platinum-200 dark:border-neutral-800 text-neutral-900 dark:text-white text-sm rounded-xl focus:ring-1 focus:ring-gold-500 focus:border-gold-500 block pl-11 p-3 transition-all outline-none resize-none"
             />
@@ -589,7 +512,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                 onClick={() => setCategory(suggestedCategory)}
                 className="absolute right-0 -top-8 bg-gold-500/10 border border-gold-500/20 text-gold-500 text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1 hover:bg-gold-500/20 transition-all animate-fade-in"
               >
-                <Lightbulb size={10} /> Suggested: {suggestedCategory}
+                <Lightbulb size={10} /> {t('transactionForm.suggested')}: {suggestedCategory}
               </button>
             )}
             <button
@@ -597,16 +520,16 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
               onClick={() => setIsSplit(true)}
               className="absolute top-0 right-0 text-[10px] text-gold-500 hover:text-gold-400 font-bold flex items-center gap-1 mt-1 uppercase tracking-wide transition-colors"
             >
-              <Split size={12} /> Split This Transaction
+              <Split size={12} /> {t('transactionForm.splitTransaction')}
             </button>
           </div>
         ) : (
           <div className="bg-white dark:bg-neutral-900 border border-platinum-200 dark:border-neutral-800 rounded-2xl p-4 animate-fade-in">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-bold text-neutral-900 dark:text-white flex items-center gap-2">
-                <Split size={16} className="text-gold-500" /> Split Transaction
+                <Split size={16} className="text-gold-500" /> {t('transactionForm.splitTitle')}
               </h3>
-              <button type="button" onClick={() => setIsSplit(false)} className="text-xs text-red-500 hover:text-red-400 font-medium">Reset</button>
+              <button type="button" onClick={() => setIsSplit(false)} className="text-xs text-red-500 hover:text-red-400 font-medium">{t('transactionForm.reset')}</button>
             </div>
             <div className="space-y-3 mb-4">
               {splits.map((split) => (
@@ -614,7 +537,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                   <div className="flex-1"><CategorySelect compact value={split.category} onChange={(val) => {
                     const newSplits = splits.map(s => s.id === split.id ? { ...s, category: val } : s);
                     setSplits(newSplits);
-                  }} placeholder="Category..." /></div>
+                  }} placeholder={t('transactionForm.selectCategory')} /></div>
                   <div className="w-24 relative">
                     <span className="absolute left-2 top-2 text-neutral-500 text-xs">{currencyObj?.symbol}</span>
                     <input type="number" value={split.amount} onChange={(e) => {
@@ -627,9 +550,9 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
               ))}
             </div>
             <div className="flex items-center justify-between border-t border-platinum-200 dark:border-neutral-800 pt-3">
-              <button type="button" onClick={() => setSplits([...splits, { id: Date.now(), category: '', amount: '' }])} className="text-xs font-bold text-neutral-500 hover:text-neutral-900 dark:hover:text-white flex items-center gap-1"><Plus size={14} /> Add Split</button>
+              <button type="button" onClick={() => setSplits([...splits, { id: Date.now(), category: '', amount: '' }])} className="text-xs font-bold text-neutral-500 hover:text-neutral-900 dark:hover:text-white flex items-center gap-1"><Plus size={14} /> {t('transactionForm.addSplit')}</button>
               <p className={`text-xs font-mono font-bold ${Math.abs(remainingSplit) > 0.05 ? 'text-red-500' : 'text-green-500'}`}>
-                {remainingSplit > 0 ? 'Remaining: ' : remainingSplit < 0 ? 'Over: ' : 'Matched: '} {currencyObj?.symbol}{Math.abs(remainingSplit).toFixed(2)}
+                {remainingSplit > 0 ? t('transactionForm.remaining') + ': ' : remainingSplit < 0 ? t('transactionForm.over') + ': ' : t('transactionForm.matched') + ': '} {currencyObj?.symbol}{Math.abs(remainingSplit).toFixed(2)}
               </p>
             </div>
           </div >
@@ -640,7 +563,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
           <button type="button" onClick={() => setIsRecurring(!isRecurring)} className="w-full p-4 flex items-center justify-between hover:bg-white dark:hover:bg-neutral-800 transition-colors">
             <div className="flex items-center gap-3">
               <div className={`p-2 rounded-lg transition-colors ${isRecurring ? 'bg-gold-500 text-neutral-950' : 'bg-platinum-200 dark:bg-neutral-950 text-neutral-500'}`}><Repeat size={18} /></div>
-              <div className="text-left"><p className={`text-sm font-bold ${isRecurring ? 'text-gold-500' : 'text-neutral-500 dark:text-neutral-400'}`}>Recurring Payment</p></div>
+              <div className="text-left"><p className={`text-sm font-bold ${isRecurring ? 'text-gold-500' : 'text-neutral-500 dark:text-neutral-400'}`}>{t('transactionForm.recurringPayment')}</p></div>
             </div>
             <div className={`w-10 h-5 rounded-full relative transition-colors ${isRecurring ? 'bg-gold-500' : 'bg-platinum-300 dark:bg-neutral-800'}`}><div className={`absolute top-1 w-3 h-3 rounded-full bg-white transition-all duration-300 ${isRecurring ? 'left-6' : 'left-1'}`}></div></div>
           </button>
@@ -648,13 +571,16 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
             <div className="p-4 pt-0 animate-fade-in border-t border-platinum-200 dark:border-neutral-800 mt-2 bg-platinum-100 dark:bg-neutral-900/50">
               <div className="pt-4 flex flex-col md:flex-row gap-4">
                 <div className="flex-1">
-                  <label className="block text-xs font-bold text-neutral-500 mb-1.5 uppercase tracking-wider">Frequency</label>
+                  <label className="block text-xs font-bold text-neutral-500 mb-1.5 uppercase tracking-wider">{t('transactionForm.frequency')}</label>
                   <select value={frequency} onChange={(e) => setFrequency(e.target.value as RecurringFrequency)} className="w-full bg-white dark:bg-neutral-950 border border-platinum-200 dark:border-neutral-800 text-neutral-900 dark:text-white text-sm rounded-xl p-3 outline-none focus:border-gold-500">
-                    <option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="yearly">Yearly</option>
+                    <option value="daily">{t('common.frequencies.daily')}</option>
+                    <option value="weekly">{t('common.frequencies.weekly')}</option>
+                    <option value="monthly">{t('common.frequencies.monthly')}</option>
+                    <option value="yearly">{t('common.frequencies.yearly')}</option>
                   </select>
                 </div>
                 <div className="flex-1">
-                  <label className="block text-xs font-bold text-neutral-500 mb-1.5 uppercase tracking-wider">End Date</label>
+                  <label className="block text-xs font-bold text-neutral-500 mb-1.5 uppercase tracking-wider">{t('transactionForm.endDate')}</label>
                   <input type="date" value={recurringEndDate} min={date} onChange={(e) => setRecurringEndDate(e.target.value)} className="w-full bg-white dark:bg-neutral-950 border border-platinum-200 dark:border-neutral-800 text-neutral-900 dark:text-white text-sm rounded-xl p-3 outline-none focus:border-gold-500 [&::-webkit-calendar-picker-indicator]:invert-0 dark:[&::-webkit-calendar-picker-indicator]:invert" />
                 </div>
               </div>
@@ -667,16 +593,16 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
           <button type="button" onClick={() => setIsBusiness(!isBusiness)} className="w-full p-4 flex items-center justify-between hover:bg-white dark:hover:bg-neutral-800 transition-colors">
             <div className="flex items-center gap-3">
               <div className={`p-2 rounded-lg transition-colors ${isBusiness ? 'bg-gold-500 text-neutral-950' : 'bg-platinum-200 dark:bg-neutral-950 text-neutral-500'}`}><Briefcase size={18} /></div>
-              <div className="text-left"><p className={`text-sm font-bold ${isBusiness ? 'text-gold-500' : 'text-neutral-500 dark:text-neutral-400'}`}>Business Expense</p></div>
+              <div className="text-left"><p className={`text-sm font-bold ${isBusiness ? 'text-gold-500' : 'text-neutral-500 dark:text-neutral-400'}`}>{t('transactionForm.businessExpense')}</p></div>
             </div>
             <div className={`w-10 h-5 rounded-full relative transition-colors ${isBusiness ? 'bg-gold-500' : 'bg-platinum-300 dark:bg-neutral-800'}`}><div className={`absolute top-1 w-3 h-3 rounded-full bg-white transition-all duration-300 ${isBusiness ? 'left-6' : 'left-1'}`}></div></div>
           </button>
           {isBusiness && (
             <div className="p-4 pt-0 animate-fade-in border-t border-platinum-200 dark:border-neutral-800 mt-2 bg-platinum-100 dark:bg-neutral-900/50">
               <div className="pt-4">
-                <label className="block text-xs font-bold text-neutral-500 mb-1.5 uppercase tracking-wider">Assign Entity</label>
+                <label className="block text-xs font-bold text-neutral-500 mb-1.5 uppercase tracking-wider">{t('transactionForm.assignEntity')}</label>
                 <select value={businessEntityId} onChange={(e) => setBusinessEntityId(e.target.value)} className="w-full bg-white dark:bg-neutral-950 border border-platinum-200 dark:border-neutral-800 text-neutral-900 dark:text-white text-sm rounded-xl p-3 outline-none focus:border-gold-500">
-                  <option value="">Select Business Unit...</option>
+                  <option value="">{t('transactionForm.selectBusiness')}</option>
                   <optgroup label="Physical Stores">{stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</optgroup>
                   <optgroup label="Digital Channels">{channels.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</optgroup>
                 </select>
@@ -686,7 +612,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
         </div>
 
         {/* Actions */}
-        <div className="pt-6 flex gap-3 border-t border-neutral-800 mt-6">
+        <div className="pt-6 flex gap-3 border-t border-platinum-200 dark:border-neutral-800 mt-6">
           {initialData && onDelete && (
             <button
               type="button"
@@ -694,7 +620,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
               className="px-4 py-3.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500/20 transition-all flex items-center justify-center gap-2 min-w-[100px] font-bold text-sm"
             >
               <Trash2 size={18} />
-              <span>Delete</span>
+              <span>{t('transactionForm.delete')}</span>
             </button>
           )}
           <button
@@ -702,7 +628,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
             onClick={onCancel}
             className="flex-1 py-3.5 rounded-xl bg-white dark:bg-neutral-900 border border-platinum-200 dark:border-neutral-800 text-neutral-500 dark:text-neutral-400 font-bold text-sm hover:text-neutral-900 dark:hover:text-white hover:bg-platinum-50 dark:hover:bg-neutral-800 transition-all"
           >
-            Cancel
+            {t('transactionForm.cancel')}
           </button>
           <button
             type="submit"
@@ -710,7 +636,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
             className="flex-[2] py-3.5 rounded-xl bg-gold-500 text-neutral-950 font-bold text-sm hover:bg-gold-400 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {initialData ? <Check size={18} /> : <Plus size={18} />}
-            {initialData ? 'Update Transaction' : 'Add Transaction'}
+            {initialData ? t('transactionForm.update') : t('transactionForm.add')}
           </button>
         </div>
 

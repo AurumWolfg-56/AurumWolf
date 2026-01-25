@@ -85,8 +85,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setSession(null);
             setUser(null);
             setProfile(null);
-            // Force redirect to ensure clean state
-            window.location.replace('/');
+            // React Router or conditional rendering will handle the redirect to Login
+            // No need to force reload
         }
     };
 

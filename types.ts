@@ -46,8 +46,10 @@ export interface BudgetCategory {
   limit: number;
   spent: number; // Calculated on frontend based on Transactions
   color: string;
-  icon?: any; // Lucide Icon name or component
-  type?: 'income' | 'expense';
+  icon_key: string; // Lucide Icon name string
+  type: 'income' | 'expense';
+  currency?: string;
+  is_system?: boolean;
 }
 
 export interface SavingsGoal {
@@ -164,5 +166,41 @@ export interface AppNotification {
   read: boolean;
   actionLabel?: string;
   actionTab?: NavTab;
-  payload?: any; // For custom actions (e.g. paying a specific recurring ID)
+  payload?: any;
+}
+
+// --- ANALYTICS TYPES ---
+
+export interface HealthBreakdown {
+  score: number;
+  details: {
+    liquidity: number;
+    savings: number;
+    debt: number;
+    diversity: number;
+    monthsRunway: number;
+    savingsRatePct: number;
+    debtRatioPct: number;
+    classCount: number;
+  };
+  isNew: boolean;
+}
+
+export interface BudgetMetrics {
+  spentThisMonth: number;
+  totalBudgetLimit: number;
+  leftToSpend: number;
+  progress: number;
+  safeLimit: number;
+}
+
+export interface ChartDataPoint {
+  fullDate: string;
+  label: string;
+  fullLabel: string;
+  value: number;
+  height: number;
+  formattedValue: string;
+  displayIncome: string;
+  displayExpense: string;
 }

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Newspaper, ExternalLink, RefreshCw, TrendingUp, Loader2, AlertCircle } from 'lucide-react';
-import { GoogleGenAI, Type } from "@google/genai";
+import { Type } from "@google/genai";
 import { Investment } from '../types';
 
 interface MarketFeedProps {
@@ -25,16 +25,14 @@ export const MarketFeed: React.FC<MarketFeedProps> = ({ assets, baseCurrency }) 
 
     const fetchMarketNews = async () => {
         if (assets.length === 0) return;
-        if (!import.meta.env.VITE_GEMINI_API_KEY) {
-            setError("API Key missing. Cannot fetch market data.");
-            return;
-        }
+
 
         setLoading(true);
         setError('');
 
         try {
-            const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
+            // Use Proxy Client
+            const { aiClient } = await import('../lib/ai/proxy');
 
             // Construct a relevant prompt based on portfolio
             const assetNames = assets.map(a => a.ticker || a.name).slice(0, 5).join(', ');
@@ -42,10 +40,10 @@ export const MarketFeed: React.FC<MarketFeedProps> = ({ assets, baseCurrency }) 
       Return a summary of the top 3 most important stories affecting these assets right now. 
       Focus on facts and market movement.`;
 
-            const response = await ai.models.generateContent({
-                model: 'gemini-3-flash-preview',
-                contents: prompt,
-                config: {
+            const response = await aiClient.generateContent(
+                'gemini-2.5-flash',
+                [{ role: 'user', parts: [{ text: prompt }] }],
+                {
                     tools: [{ googleSearch: {} }],
                     responseMimeType: "application/json",
                     responseSchema: {
@@ -60,14 +58,15 @@ export const MarketFeed: React.FC<MarketFeedProps> = ({ assets, baseCurrency }) 
                             }
                         }
                     }
-                },
-            });
+                }
+            );
 
             // 1. Parse JSON Response
             let parsedNews: NewsItem[] = [];
-            if (response.text) {
+            const text = response.text();
+            if (text) {
                 try {
-                    parsedNews = JSON.parse(response.text);
+                    parsedNews = JSON.parse(text);
                 } catch (e) {
                     console.error("Failed to parse news JSON", e);
                 }
@@ -78,10 +77,11 @@ export const MarketFeed: React.FC<MarketFeedProps> = ({ assets, baseCurrency }) 
             // mapping exact chunks to JSON items is tricky. 
             // We will try to extract sources from the chunks and append them if the JSON didn't have good URLs.
 
-            const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+            const rawResponse = (response as any).raw;
+            const chunks = rawResponse?.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
             const webSources = chunks
-                .map(c => c.web)
-                .filter(w => w && w.uri && w.title);
+                .map((c: any) => c.web)
+                .filter((w: any) => w && w.uri && w.title);
 
             // Enhance parsed news with URLs if available from grounding
             parsedNews = parsedNews.map((item, index) => {
@@ -98,34 +98,9 @@ export const MarketFeed: React.FC<MarketFeedProps> = ({ assets, baseCurrency }) 
             setLastUpdated(new Date());
 
         } catch (err) {
-            console.warn("Market API unavailable, switching to simulation mode.");
-            // Mock Data Fallback for Premium UI experience
-            const mockNews: NewsItem[] = [
-                {
-                    title: "Tech Sector Rallies as AI Adoption Accelerates",
-                    source: "Bloomberg",
-                    url: "#",
-                    sentiment: 'positive',
-                    snippet: "Major technology stocks are seeing significant gains today as institutional investors increase exposure to artificial intelligence infrastructure."
-                },
-                {
-                    title: "Federal Reserve Signals Potential Rate Cut in Q3",
-                    source: "The Wall Street Journal",
-                    url: "#",
-                    sentiment: 'neutral',
-                    snippet: "Central bank officials hint at easing monetary policy later this year if inflation data continues to show stabilization."
-                },
-                {
-                    title: "Crypto Markets Volatile Amid Regulatory News",
-                    source: "CoinDesk",
-                    url: "#",
-                    sentiment: 'negative',
-                    snippet: "Blockchain assets are trading sideways as markets await clarification on new digital asset regulations in the EU."
-                }
-            ];
-            setNews(mockNews);
-            setLastUpdated(new Date());
-            setError(''); // Clear error to avoid ugly UI
+            console.warn("Market API unavailable.", err);
+            setError("Unable to fetch live market news at this time.");
+            setNews([]);
         } finally {
             setLoading(false);
         }

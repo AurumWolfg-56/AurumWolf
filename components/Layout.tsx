@@ -36,6 +36,7 @@ interface LayoutProps {
   t: (key: string) => string;
   onSignOut: () => void;
   language: string;
+  isLoading?: boolean;
 }
 
 export const Layout: React.FC<LayoutProps> = ({
@@ -59,7 +60,8 @@ export const Layout: React.FC<LayoutProps> = ({
   userEmail,
   t,
   onSignOut,
-  language
+  language,
+  isLoading
 }) => {
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
@@ -101,20 +103,23 @@ export const Layout: React.FC<LayoutProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-platinum-100 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-200 font-sans selection:bg-gold-500/30 selection:text-gold-100 transition-colors duration-300 pb-safe">
+    <div className="min-h-screen bg-platinum-100 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-200 font-sans selection:bg-gold-500/30 selection:text-gold-100 transition-colors duration-300 pb-safe relative isolate">
+      {/* Ambient Background Glows */}
+      {/* Ambient Background Glows */}
 
       {/* Mobile Top Bar */}
-      <header className="md:hidden fixed top-0 left-0 right-0 h-16 bg-white/90 dark:bg-neutral-950/90 backdrop-blur-xl border-b border-platinum-200 dark:border-neutral-900 z-[60] flex items-center px-4 transition-all duration-300">
+      {/* Mobile Top Bar */}
+      <header className="md:hidden fixed top-0 left-0 right-0 h-[safe-area-inset-top+64px] pb-2 pt-safe glass border-b border-white/10 z-[60] flex items-end px-5 transition-all duration-300 shadow-sm dark:shadow-none">
 
         {isMobileSearchOpen ? (
-          <div className="flex items-center w-full gap-2 animate-fade-in" role="search">
+          <div className="flex items-center w-full gap-3 animate-fade-in pb-2" role="search">
             <button
               type="button"
               onClick={() => {
                 setIsMobileSearchOpen(false);
                 onSearch?.('');
               }}
-              className="p-2 -ml-2 text-neutral-400 hover:text-white"
+              className="p-2 -ml-2 text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors"
               aria-label="Close search"
             >
               <ChevronLeft size={24} aria-hidden="true" />
@@ -126,61 +131,55 @@ export const Layout: React.FC<LayoutProps> = ({
                 value={searchQuery}
                 onChange={(e) => onSearch?.(e.target.value)}
                 placeholder="Search..."
-                className="w-full bg-platinum-100 dark:bg-neutral-900 border border-platinum-200 dark:border-neutral-800 text-neutral-900 dark:text-neutral-200 text-sm rounded-full focus:ring-1 focus:ring-gold-500 focus:border-gold-500 block pl-4 pr-10 p-2.5 outline-none placeholder:text-neutral-500 dark:placeholder:text-neutral-600 transition-colors"
+                className="w-full bg-platinum-100 dark:bg-neutral-900 border border-platinum-200 dark:border-neutral-800 text-neutral-900 dark:text-neutral-200 text-sm rounded-2xl focus:ring-1 focus:ring-gold-500 focus:border-gold-500 block pl-4 pr-10 py-3 outline-none placeholder:text-neutral-500 dark:placeholder:text-neutral-600 transition-shadow shadow-inner"
                 aria-label="Search transactions"
               />
               {searchQuery && (
                 <button
                   type="button"
                   onClick={() => onSearch?.('')}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-500 p-1"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 p-1 hover:text-neutral-900 dark:hover:text-white"
                   aria-label="Clear search query"
                 >
-                  <X size={14} aria-hidden="true" />
+                  <X size={16} aria-hidden="true" />
                 </button>
               )}
             </div>
           </div>
         ) : (
-          <div className="flex items-center justify-between w-full">
-            {/* Branding & Menu Trigger (Still useful for drawer access to extra pages) */}
-            <div className="flex items-center gap-3">
+          <div className="flex items-center justify-between w-full h-14 pb-1">
+            {/* Branding & Menu Trigger */}
+            <div className="flex items-center gap-4">
               <button
                 onClick={() => setIsMobileMenuOpen(true)}
-                className="p-2 -ml-2 text-neutral-500 hover:text-white transition-colors"
+                className="p-2 -ml-2 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors active:scale-95"
               >
-                <Menu size={24} />
+                <Menu size={26} strokeWidth={1.5} />
               </button>
-              <div onClick={() => onTabChange('home')} className="active:opacity-80 transition-opacity">
+              <div onClick={() => onTabChange('home')} className="active:opacity-80 transition-opacity pt-1">
                 <Logo iconSize="w-8 h-8" textSize="text-lg" />
               </div>
             </div>
 
             {/* Actions */}
-            <div className="flex items-center gap-1">
-              <button
-                onClick={onTogglePrivacy}
-                className="p-2 text-neutral-400 hover:text-white transition-colors"
-              >
-                {privacyMode ? <EyeOff size={20} className="text-gold-500" /> : <Eye size={20} />}
-              </button>
+            <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => setIsCommandPaletteOpen(true)}
-                className="p-2 text-neutral-400 hover:text-gold-500 transition-colors"
+                className="p-2 text-neutral-500 dark:text-neutral-400 hover:text-gold-500 transition-colors"
                 aria-label="Open command palette"
               >
-                <Search size={20} aria-hidden="true" />
+                <Search size={22} strokeWidth={2} aria-hidden="true" />
               </button>
               <button
                 type="button"
                 onClick={() => setIsNotificationOpen(true)}
-                className="p-2 text-neutral-400 hover:text-gold-500 transition-colors relative"
+                className="p-2 text-neutral-500 dark:text-neutral-400 hover:text-gold-500 transition-colors relative flex-shrink-0"
                 aria-label="Notifications"
               >
-                <Bell size={20} aria-hidden="true" />
+                <Bell size={22} strokeWidth={2} aria-hidden="true" />
                 {notifications.length > 0 && (
-                  <span className="absolute top-2 right-2.5 w-1.5 h-1.5 bg-red-500 rounded-full border border-neutral-950 animate-pulse"></span>
+                  <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full border border-white dark:border-neutral-950 animate-pulse"></span>
                 )}
               </button>
             </div>
@@ -195,10 +194,13 @@ export const Layout: React.FC<LayoutProps> = ({
         onNewTransaction={onNewTransaction}
         isMobileMenuOpen={isMobileMenuOpen}
         onCloseMobileMenu={() => setIsMobileMenuOpen(false)}
+        onSignOut={onSignOut}
+        isLoading={isLoading}
+        t={t}
         userName={userName}
         userEmail={userEmail}
-        t={t}
-        onSignOut={onSignOut}
+        privacyMode={privacyMode}
+        onTogglePrivacy={onTogglePrivacy}
       />
 
       {/* Main Content Area */}
@@ -217,8 +219,8 @@ export const Layout: React.FC<LayoutProps> = ({
           items-center justify-between 
           h-20
           px-8
-          bg-white/80 dark:bg-neutral-950/80 backdrop-blur-xl 
-          border-b border-platinum-200 dark:border-neutral-900
+          glass
+          border-b border-white/10
           transition-colors duration-300
         ">
           <div className="flex items-center text-sm font-medium text-neutral-500">
@@ -249,7 +251,7 @@ export const Layout: React.FC<LayoutProps> = ({
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <Search size={16} className="text-neutral-500 group-hover:text-gold-500 transition-colors" aria-hidden="true" />
               </div>
-              <div className="w-full bg-platinum-100/50 dark:bg-neutral-900/50 border border-platinum-200 dark:border-neutral-800 text-neutral-500 dark:text-neutral-400 text-sm rounded-xl py-2.5 pl-10 pr-12 transition-all shadow-sm group-hover:border-gold-500/30 flex items-center">
+              <div className="w-full bg-platinum-100/50 dark:bg-neutral-900/50 border border-transparent dark:border-white/10 text-neutral-500 dark:text-neutral-400 text-sm rounded-xl py-2.5 pl-10 pr-12 transition-all shadow-sm group-hover:border-gold-500/30 group-hover:bg-white dark:group-hover:bg-neutral-800 flex items-center">
                 <span className="opacity-70">{t('common.search')}</span>
               </div>
               {/* Keyboard Hint */}
@@ -300,6 +302,9 @@ export const Layout: React.FC<LayoutProps> = ({
         activeTab={activeTab}
         onAddTransactionData={onAddTransactionData}
         onAddBudget={onAddBudget}
+        t={t}
+        language={language}
+        privacyMode={privacyMode}
       />
 
       {/* Notification Panel (Global) */}

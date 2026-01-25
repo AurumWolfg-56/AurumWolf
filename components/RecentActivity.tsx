@@ -30,7 +30,7 @@ export const RecentActivity: React.FC<RecentActivityProps> = ({ transactions, ba
         .slice(0, 5);
 
     return (
-        <div className="bg-white dark:bg-neutral-900 border border-platinum-200 dark:border-neutral-800 rounded-[2rem] p-6 shadow-sm">
+        <div className="h-full p-4">
             <div className="flex justify-between items-center mb-6">
                 <h3 className="text-sm font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-2">
                     Recent Activity
@@ -50,11 +50,11 @@ export const RecentActivity: React.FC<RecentActivityProps> = ({ transactions, ba
                         const isCredit = tx.type === 'credit';
 
                         return (
-                            <div key={tx.id} className="flex items-center justify-between group">
+                            <div key={tx.id} className="flex items-center justify-between group p-3 rounded-2xl hover:bg-gold-500/5 dark:hover:bg-gold-500/5 hover:scale-[1.02] transition-all cursor-default border border-transparent hover:border-gold-500/10 active:scale-[0.98]">
                                 <div className="flex items-center gap-4">
                                     <div className={`w-10 h-10 rounded-full flex items-center justify-center border ${isCredit
-                                            ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500'
-                                            : 'bg-neutral-100 dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700 text-neutral-500 dark:text-neutral-400'
+                                        ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500'
+                                        : 'bg-neutral-100 dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700 text-neutral-500 dark:text-neutral-400'
                                         }`}>
                                         <Icon size={18} />
                                     </div>

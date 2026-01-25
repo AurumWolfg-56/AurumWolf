@@ -4,6 +4,9 @@ import { Account } from '../types';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
 
+import { parseSupabaseData } from '../lib/supabaseSafe';
+import { AccountSchema } from '../lib/validators';
+
 interface AccountsContextType {
   accounts: Account[];
   addAccount: (account: Account) => Promise<void>;
@@ -37,7 +40,7 @@ export const AccountsProvider = ({ children }: { children: ReactNode }) => {
       if (error) {
         console.error('Error fetching accounts:', error);
       } else {
-        const mapped: Account[] = (data || []).map((row: any) => ({
+        const candidates = (data || []).map((row: any) => ({
           ...row,
           isFrozen: row.is_frozen,
           creditDetails: row.credit_details,
@@ -45,7 +48,9 @@ export const AccountsProvider = ({ children }: { children: ReactNode }) => {
           linked_business_id: row.linked_business_id,
           balance: Number(row.balance)
         }));
-        setAccounts(mapped);
+
+        const validAccounts = parseSupabaseData(AccountSchema, candidates, []) as Account[];
+        setAccounts(validAccounts);
       }
       setLoading(false);
     };
@@ -53,10 +58,16 @@ export const AccountsProvider = ({ children }: { children: ReactNode }) => {
     fetchAccounts();
   }, [user]);
 
+  // --- SAFE ORCHESTRATION ---
+
   const addAccount = async (account: Account) => {
+    // 1. Optimistic Update
+    const prevAccounts = [...accounts];
     setAccounts(prev => [...prev, account]);
 
-    if (user) {
+    if (!user) return; // Local mode only
+
+    try {
       const dbPayload = {
         id: account.id,
         user_id: user.id,
@@ -66,22 +77,33 @@ export const AccountsProvider = ({ children }: { children: ReactNode }) => {
         currency: account.currency,
         institution: account.institution,
         color: account.color,
-        is_frozen: account.isFrozen,
-        credit_details: account.creditDetails,
+        is_frozen: account.isFrozen || false,
+        credit_details: account.creditDetails || null,
 
-        business_details: account.businessDetails,
-        linked_business_id: account.linked_business_id
+        business_details: account.businessDetails || null,
+        linked_business_id: account.linked_business_id || null,
+        last4: account.last4 || null
       };
 
       const { error } = await supabase.from('accounts').insert(dbPayload);
-      if (error) console.error("Error adding account:", error);
+      if (error) throw error;
+
+    } catch (err) {
+      console.error("Error adding account:", err);
+      // Rollback
+      setAccounts(prevAccounts);
+      // Optional: Toast notification here if we had a toast system
+      alert("Failed to save account. Please check your connection.");
     }
   };
 
   const updateAccount = async (account: Account) => {
+    const prevAccounts = [...accounts];
     setAccounts(prev => prev.map(a => a.id === account.id ? account : a));
 
-    if (user) {
+    if (!user) return;
+
+    try {
       const dbPayload = {
         name: account.name,
         type: account.type,
@@ -92,20 +114,30 @@ export const AccountsProvider = ({ children }: { children: ReactNode }) => {
         is_frozen: account.isFrozen,
         credit_details: account.creditDetails,
         business_details: account.businessDetails,
-        linked_business_id: account.linked_business_id
+        linked_business_id: account.linked_business_id,
+        last4: account.last4
       };
 
       const { error } = await supabase.from('accounts').update(dbPayload).eq('id', account.id);
-      if (error) console.error("Error updating account:", error);
+      if (error) throw error;
+    } catch (err) {
+      console.error("Error updating account:", err);
+      setAccounts(prevAccounts);
     }
   };
 
   const deleteAccount = async (id: string) => {
+    const prevAccounts = [...accounts];
     setAccounts(prev => prev.filter(a => a.id !== id));
 
-    if (user) {
+    if (!user) return;
+
+    try {
       const { error } = await supabase.from('accounts').delete().eq('id', id);
-      if (error) console.error("Error deleting account:", error);
+      if (error) throw error;
+    } catch (err) {
+      console.error("Error deleting account:", err);
+      setAccounts(prevAccounts);
     }
   };
 

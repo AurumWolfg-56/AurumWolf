@@ -1,0 +1,7 @@
+
+> aurumwolf@0.0.0 typecheck
+> tsc --noEmit
+
+components/DashboardPage.tsx(144,5): error TS2300: Duplicate identifier 'language'.
+components/DashboardPage.tsx(145,5): error TS2300: Duplicate identifier 'language'.
+components/DashboardPage.tsx(355,64): error TS2304: Cannot find name 'userName'.

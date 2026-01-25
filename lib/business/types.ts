@@ -9,6 +9,7 @@ export interface MetricDefinition {
     description?: string;
     type: MetricType;
     is_calculated: boolean;
+    format?: string;
     format_options?: Record<string, any>;
 }
 

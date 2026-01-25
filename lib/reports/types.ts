@@ -24,6 +24,7 @@ export interface MetricValue {
     delta?: number; // percent change vs previous period
     deltaValue?: number; // absolute change
     trend?: number[]; // series for sparkline
+    currency?: string;
 }
 
 export interface CategoryBreakdown {

@@ -1,16 +1,18 @@
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { Layout } from './components/Layout';
 import { DashboardPage } from './components/DashboardPage';
 import { AccountsPage } from './components/AccountsPage';
 import { TransactionsPage } from './components/TransactionsPage';
 import { BudgetPage } from './components/BudgetPage';
 import { BusinessPage } from './components/BusinessPage';
+import { useBusiness } from './contexts/BusinessContext';
 import { InvestmentsPage } from './components/InvestmentsPage';
 import { ReportsPage } from './components/ReportsPage';
 import { SettingsPage } from './components/SettingsPage';
 import { ScanPage } from './components/ScanPage';
-import { LockScreen } from './components/LockScreen';
+
 import { TransactionForm } from './components/TransactionForm';
 
 import {
@@ -24,9 +26,8 @@ import {
 import {
     getJSON, setJSON, getSafeArray, STORAGE_KEYS, migrateIfNeeded, clearData
 } from './lib/storage';
-import {
-    computeNetWorth, computeBudgetSpentMonthly, computeBusinessMetrics
-} from './lib/selectors';
+// selectors available if needed, though useFinancialMetrics handles most logic now
+import { computeNetWorth, computeBudgetSpentMonthly, computeBusinessMetrics } from './lib/selectors';
 import { reconcileAccountBalance, convertAmount, formatCurrency } from './lib/money';
 import { addMonthsToDate, addDaysToDate, addYearsToDate, getLocalDateISO } from './lib/dates';
 
@@ -35,13 +36,26 @@ import { useAccounts } from './contexts/AccountsContext';
 import { useTransactions } from './contexts/TransactionsContext';
 import { useBudgets } from './contexts/BudgetsContext';
 import { useInvestments } from './contexts/InvestmentsContext';
-import { useBusiness } from './contexts/BusinessContext';
-
+import { useCategories } from './contexts/CategoryContext';
 import { useAuth } from './contexts/AuthContext';
+import { useSecurity } from './contexts/SecurityContext'; // If needed, or just provider
+
+// Custom Hooks
+import { useFinancialMetrics } from './hooks/useFinancialMetrics';
+import { useNotificationEngine } from './hooks/useNotificationEngine';
+import { useTransactionOrchestrator } from './hooks/useTransactionOrchestrator';
+import { useTransactionOperations } from './hooks/useTransactionOperations';
+
+// Security Components
+import { SecurityProvider } from './contexts/SecurityContext';
+import { AppLock } from './components/AppLock';
+import { PrivacyShield } from './components/PrivacyShield';
+
+// Auth Pages
 import { LoginPage } from './components/LoginPage';
 import { ResetPasswordPage } from './components/ResetPasswordPage';
 
-// ... (keep imports)
+// ...
 
 export default function App() {
     const { user, profile, loading, signOut, passwordRecoveryMode } = useAuth();
@@ -49,12 +63,22 @@ export default function App() {
     // Context Data
     const { accounts, addAccount, updateAccount, deleteAccount, refreshAccounts } = useAccounts();
     const { transactions, addTransaction, updateTransaction, deleteTransaction, refreshTransactions } = useTransactions();
+
+    // New Category Context
     const {
-        budgets, goals,
-        addBudget, updateBudget, deleteBudget,
+        categories,
+        addCategory,
+        updateCategory,
+        deleteCategory
+    } = useCategories();
+
+    // Legacy Budgets Context (Only for Goals now)
+    const {
+        goals,
         addGoal, updateGoal, deleteGoal,
         refreshBudgets
     } = useBudgets();
+
     const { investments } = useInvestments();
     const { entities: businessEntities, healthScores } = useBusiness();
 
@@ -67,6 +91,7 @@ export default function App() {
 
     // ... (rest of App component)
     const [language, setLanguage] = useState<Language>(() => getJSON(STORAGE_KEYS.LANGUAGE, 'en'));
+    const [notificationsEnabled, setNotificationsEnabled] = useState(() => getJSON(STORAGE_KEYS.NOTIFICATIONS_ENABLED, true));
     const [privacyMode, setPrivacyMode] = useState(() => getJSON(STORAGE_KEYS.PRIVACY, false));
     const [searchQuery, setSearchQuery] = useState('');
     const [showTransactionForm, setShowTransactionForm] = useState(false);
@@ -86,7 +111,7 @@ export default function App() {
     // Initialize OTHER state (not moved to context yet)
 
 
-    const [notifications, setNotifications] = useState<AppNotification[]>([]);
+
 
     // --- PERSISTENCE FOR OTHER STATE ---
     useEffect(() => {
@@ -101,68 +126,32 @@ export default function App() {
         // Investments and Business are also handled by Contexts (Phase 2)
         setJSON(STORAGE_KEYS.BASE_CURRENCY, baseCurrency);
         setJSON(STORAGE_KEYS.LANGUAGE, language);
+        setJSON(STORAGE_KEYS.NOTIFICATIONS_ENABLED, notificationsEnabled);
         setJSON(STORAGE_KEYS.PRIVACY, privacyMode);
-    }, [baseCurrency, language, privacyMode]);
+    }, [baseCurrency, language, notificationsEnabled, privacyMode]);
 
-    // --- DERIVED STATE (SELECTORS) ---
-    const netWorth = useMemo(() => computeNetWorth(accounts, investments, baseCurrency), [accounts, investments, baseCurrency]);
-    const enrichedBudgets = useMemo(() => computeBudgetSpentMonthly(budgets, transactions, baseCurrency), [budgets, transactions, baseCurrency]);
-    const enrichedEntities = useMemo(() => computeBusinessMetrics(businessEntities, transactions, baseCurrency), [businessEntities, transactions, baseCurrency]);
-
-    // --- NOTIFICATION ENGINE ---
-    useEffect(() => {
-        const todayStr = new Date().toISOString().split('T')[0];
-        const generated: AppNotification[] = [];
-
-        // 1. Budget Alerts
-        enrichedBudgets.forEach(b => {
-            if (b.type !== 'income' && b.limit > 0 && b.spent > b.limit) {
-                const excess = b.spent - b.limit;
-                generated.push({
-                    id: `budget-${b.id}`,
-                    title: `${t('budget.alert')}: ${b.category}`,
-                    message: `${t('budget.alertMessage')} ${formatCurrency(excess, baseCurrency)}.`,
-                    type: 'critical',
-                    timestamp: new Date(),
-                    read: false,
-                    actionLabel: 'Adjust Plan',
-                    actionTab: 'budget'
-                });
-            }
-        });
-
-        // 2. Recurring Due Alerts
-        transactions.forEach(t => {
-            if (t.isRecurring && t.nextRecurringDate && t.nextRecurringDate <= todayStr) {
-                // Stop if past end date
-                if (t.recurringEndDate && t.nextRecurringDate > t.recurringEndDate) return;
-
-                generated.push({
-                    id: `rec-due-${t.id}-${t.nextRecurringDate}`,
-                    title: `Subscription Due: ${t.name}`,
-                    message: `${t.amount} is due today.`,
-                    type: 'warning',
-                    timestamp: new Date(),
-                    read: false,
-                    actionLabel: 'Pay Now',
-                    actionTab: 'transactions',
-                    payload: { action: 'payRecurring', transactionId: t.id }
-                });
-            }
-        });
-
-        // 3. Deduplicate & Merge
-        setNotifications(prev => {
-            const existingIds = new Set(prev.map(n => n.id));
-            const newItems = generated.filter(n => !existingIds.has(n.id));
-
-            if (newItems.length === 0) return prev;
-
-            // Newest first, max 10
-            return [...newItems, ...prev].slice(0, 10);
-        });
-
-    }, [enrichedBudgets, transactions, baseCurrency]);
+    // --- DERIVED STATE (Refactored to Hook) ---
+    const {
+        netWorth,
+        enrichedBudgets,
+        enrichedEntities,
+        assetsByType,
+        monthlySurplus,
+        budgetMetrics,
+        healthScore,
+        healthBreakdown, // New
+        spendingTrend,
+        chartData,
+        upcomingBills
+    } = useFinancialMetrics({
+        transactions,
+        accounts,
+        budgets: categories, // Pass categories as budgets
+        investments,
+        businessEntities,
+        baseCurrency,
+        language
+    });
 
     const t = useCallback((key: string) => {
         const keys = key.split('.');
@@ -173,135 +162,39 @@ export default function App() {
         return val || key;
     }, [language]);
 
+    // --- NOTIFICATION ENGINE ---
+    const { notifications, setNotifications } = useNotificationEngine(transactions, enrichedBudgets, baseCurrency, t, notificationsEnabled);
+
     // --- SAFETY WRAPPERS ---
     // Ensure we never persist the calculated 'spent' value to storage.
     // We reset it to 0 before saving to state (which triggers the persistence useEffect).
 
-    const calculateNextDate = (startDate: string, freq: RecurringFrequency): string => {
-        if (freq === 'daily') return addDaysToDate(startDate, 1);
-        if (freq === 'weekly') return addDaysToDate(startDate, 7);
-        if (freq === 'monthly') return addMonthsToDate(startDate, 1);
-        if (freq === 'yearly') return addYearsToDate(startDate, 1);
-        return startDate;
-    };
-
     // --- ORCHESTRATION HANDLERS ---
-    // These handlers use context setters to update multiple stores if needed
+    const { handleSaveTransaction: saveTransaction } = useTransactionOrchestrator({
+        transactions,
+        accounts,
+        addTransaction,
+        updateTransaction,
+        updateAccount,
+        pendingRecurringId,
+        setPendingRecurringId
+    });
 
     const handleSaveTransaction = (tx: Transaction) => {
-        let oldTx: Transaction | undefined;
-
-        // 1. Capture old state if editing
-        if (editingTransaction) {
-            oldTx = transactions.find(t => t.id === tx.id);
-            updateTransaction(tx);
-        } else {
-            addTransaction(tx);
-        }
-
-        // Handle Recurring Update (if this was a "Pay Now" action)
-        if (pendingRecurringId) {
-            const parent = transactions.find(t => t.id === pendingRecurringId);
-            if (parent && parent.isRecurring && parent.recurringFrequency) {
-                const nextDate = calculateNextDate(parent.nextRecurringDate || parent.date, parent.recurringFrequency);
-                updateTransaction({
-                    ...parent,
-                    nextRecurringDate: nextDate
-                });
-            }
-            setPendingRecurringId(null);
-        }
-
-        // 2. Simulate the new transaction list locally to calculate balances immediately
-        // (Context update is async, so we can't rely on 'transactions' being updated yet)
-        let updatedTransactionsList = editingTransaction
-            ? transactions.map(t => t.id === tx.id ? tx : t)
-            : [tx, ...transactions];
-
-        // 3. Reconcile the NEW account (Target)
-        const newAccount = accounts.find(a => a.id === tx.accountId);
-        if (newAccount) {
-            const newBalance = reconcileAccountBalance(newAccount, updatedTransactionsList);
-            updateAccount({ ...newAccount, balance: newBalance });
-        }
-
-        // 4. If editing and the account ID changed, we MUST reconcile the OLD account too
-        // The old account needs to "remove" this transaction from its history.
-        // Since 'updatedTransactionsList' now has the transaction pointing to the NEW accountId,
-        // reconcileAccountBalance(oldAccount, updatedTransactionsList) will automatically 
-        // exclude this transaction, resulting in the correct balance.
-        if (editingTransaction && oldTx && oldTx.accountId !== tx.accountId) {
-            const oldAccount = accounts.find(a => a.id === oldTx?.accountId);
-            if (oldAccount) {
-                const oldBalance = reconcileAccountBalance(oldAccount, updatedTransactionsList);
-                updateAccount({ ...oldAccount, balance: oldBalance });
-            }
-        }
-
+        saveTransaction(tx, editingTransaction);
         setShowTransactionForm(false);
         setEditingTransaction(null);
         setScannedData(null);
     };
 
-    const handleDeleteTransactionWrapper = (id: string) => {
-        const tx = transactions.find(t => t.id === id);
-
-        deleteTransaction(id);
-
-        if (tx) {
-            // Reconcile account balance after deletion
-            const updatedTransactionsList = transactions.filter(t => t.id !== id);
-            const account = accounts.find(a => a.id === tx.accountId);
-            if (account) {
-                const newBalance = reconcileAccountBalance(account, updatedTransactionsList);
-                updateAccount({ ...account, balance: newBalance });
-            }
-        }
-        setShowTransactionForm(false);
-        setEditingTransaction(null);
-    };
-
-    const handleTransfer = (from: string, to: string, amount: number, date: string) => {
-        const fromAcc = accounts.find(a => a.id === from);
-        const toAcc = accounts.find(a => a.id === to);
-        if (!fromAcc || !toAcc) return;
-
-        const txOut: Transaction = {
-            id: crypto.randomUUID(),
-            accountId: from,
-            name: `Transfer to ${toAcc.name}`,
-            amount: formatCurrency(amount, fromAcc.currency),
-            numericAmount: amount,
-            currency: fromAcc.currency,
-            date,
-            category: 'Transfer',
-            type: 'debit',
-            status: 'completed'
-        };
-
-        const txIn: Transaction = {
-            id: crypto.randomUUID(),
-            accountId: to,
-            name: `Transfer from ${fromAcc.name}`,
-            amount: formatCurrency(convertAmount(amount, fromAcc.currency, toAcc.currency), toAcc.currency),
-            numericAmount: convertAmount(amount, fromAcc.currency, toAcc.currency),
-            currency: toAcc.currency,
-            date,
-            category: 'Transfer',
-            type: 'credit',
-            status: 'completed'
-        };
-
-        addTransaction(txOut);
-        addTransaction(txIn);
-
-        const newTxs = [txIn, txOut, ...transactions];
-        const newFromBal = reconcileAccountBalance(fromAcc, newTxs);
-        const newToBal = reconcileAccountBalance(toAcc, newTxs);
-
-        updateAccount({ ...fromAcc, balance: newFromBal });
-        updateAccount({ ...toAcc, balance: newToBal });
-    };
+    // --- OPERATIONS HANDLER (Refactored) ---
+    const { handleTransfer, handleDeleteTransaction: handleDeleteTransactionWrapper } = useTransactionOperations({
+        transactions,
+        accounts,
+        addTransaction,
+        deleteTransaction,
+        updateAccount
+    });
 
     // --- RENDER ---
     // Removed legacy LockScreen check
@@ -328,17 +221,16 @@ export default function App() {
         if (payload?.action === 'payRecurring' && payload.transactionId) {
             const original = transactions.find(t => t.id === payload.transactionId);
             if (original) {
+                // Destructure to remove recurring properties cleanly without 'delete' operator
+                const { recurringFrequency, nextRecurringDate, recurringEndDate, ...rest } = original;
+
                 const paymentTemplate: Transaction = {
-                    ...original,
+                    ...rest,
                     id: crypto.randomUUID(), // New ID for payment
                     date: getLocalDateISO(), // Use local date
                     isRecurring: false,
                     status: 'completed',
                 };
-                // Strip recurring fields
-                delete (paymentTemplate as any).recurringFrequency;
-                delete (paymentTemplate as any).nextRecurringDate;
-                delete (paymentTemplate as any).recurringEndDate;
 
                 setEditingTransaction(paymentTemplate);
                 setPendingRecurringId(payload.transactionId); // To update original's next date on save
@@ -375,6 +267,7 @@ export default function App() {
                         setScannedData(null);
                         setPendingRecurringId(null);
                     }}
+                    t={t}
                 />
             );
         }
@@ -387,6 +280,16 @@ export default function App() {
                     privacyMode={privacyMode}
                     baseCurrency={baseCurrency}
                     t={t}
+                    language={language}
+                    // New Props
+                    assetsByType={assetsByType}
+                    monthlySurplus={monthlySurplus}
+                    budgetMetrics={budgetMetrics}
+                    healthScore={healthScore}
+                    spendingTrend={spendingTrend}
+                    chartData={chartData}
+                    upcomingBills={upcomingBills}
+                    healthBreakdown={healthBreakdown}
                 />;
             case 'accounts':
                 return <AccountsPage
@@ -426,9 +329,13 @@ export default function App() {
             case 'budget':
                 return <BudgetPage
                     budgets={enrichedBudgets}
-                    onUpdateBudget={updateBudget}
-                    onAddBudget={addBudget}
-                    onDeleteBudget={deleteBudget}
+                    onUpdateBudget={updateCategory}
+                    onAddBudget={(b) => {
+                        // Strip temporary ID and spent, ensure only required fields are passed
+                        const { id, spent, user_id, ...rest } = b;
+                        addCategory(rest);
+                    }}
+                    onDeleteBudget={deleteCategory}
                     goals={goals}
                     onUpdateGoal={updateGoal}
                     onAddGoal={addGoal}
@@ -486,6 +393,8 @@ export default function App() {
                     onCurrencyChange={setBaseCurrency}
                     onLanguageChange={setLanguage}
                     currentLanguage={language}
+                    notificationsEnabled={notificationsEnabled}
+                    onToggleNotifications={() => setNotificationsEnabled(!notificationsEnabled)}
                     onSignOut={() => signOut()}
                     onReconcile={() => {
                         const updates = accounts.map(a => {
@@ -508,51 +417,70 @@ export default function App() {
     };
 
     // --- MAIN RENDER ---
+    // --- MAIN RENDER ---
     const shouldShowLoader = loading;
     const shouldShowLogin = !user && !loading;
 
-    if (shouldShowLoader) {
-        return (
-            <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500"></div>
-            </div>
-        );
-    }
-
-    if (passwordRecoveryMode) {
-        return <ResetPasswordPage t={t} />;
-    }
-
-    if (shouldShowLogin) {
-        return <LoginPage t={t} />;
-    }
-
     return (
-        <Layout
-            activeTab={activeTab}
-            onTabChange={handleNavigation}
-            onNewTransaction={() => { setEditingTransaction(null); setShowTransactionForm(true); }}
-            privacyMode={privacyMode}
-            onTogglePrivacy={() => setPrivacyMode(!privacyMode)}
-            transactions={transactions}
-            accounts={accounts}
-            budgets={enrichedBudgets}
-            investments={investments}
-            notifications={notifications}
-            onClearNotifications={() => setNotifications([])}
-            onAddBudget={addBudget}
-            onAddTransactionData={(tx) => {
-                setScannedData(tx);
-                setActiveTab('transactions');
-                setShowTransactionForm(true);
-            }}
-            userName={profile?.full_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Auth User"}
-            userEmail={user?.email}
-            t={t}
-            onSignOut={() => signOut()}
-            language={language}
-        >
-            {renderContent()}
-        </Layout>
+        <SecurityProvider>
+            {/* App Lock should be active globally if enabled */}
+            <AppLock />
+            <PrivacyShield />
+
+            {shouldShowLoader ? (
+                <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500"></div>
+                </div>
+            ) : passwordRecoveryMode ? (
+                <ResetPasswordPage t={t} />
+            ) : shouldShowLogin ? (
+                <LoginPage t={t} />
+            ) : (
+                <Layout
+                    activeTab={activeTab}
+                    onTabChange={handleNavigation}
+                    onNewTransaction={() => { setEditingTransaction(null); setShowTransactionForm(true); }}
+                    privacyMode={privacyMode}
+                    onTogglePrivacy={() => setPrivacyMode(!privacyMode)}
+                    transactions={transactions}
+                    accounts={accounts}
+                    budgets={enrichedBudgets}
+                    investments={investments}
+                    notifications={notifications}
+                    onClearNotifications={() => setNotifications([])}
+                    onAddBudget={(b) => {
+                        const { id, spent, user_id, ...rest } = b;
+                        // Check if category already exists (UPSERT Logic)
+                        const existing = categories.find(c => c.category === b.category);
+                        if (existing) {
+                            // Update existing category with new limit/type/color/icon
+                            updateCategory({
+                                ...existing,
+                                limit: b.limit,
+                                type: b.type,
+                                color: b.color,
+                                icon_key: b.icon_key
+                            });
+                        } else {
+                            // Create new category
+                            addCategory(rest);
+                        }
+                    }}
+                    onAddTransactionData={(tx) => {
+                        setScannedData(tx);
+                        setActiveTab('transactions');
+                        setShowTransactionForm(true);
+                    }}
+                    userName={profile?.full_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Auth User"}
+                    userEmail={user?.email}
+                    t={t}
+                    onSignOut={() => signOut()}
+                    language={language}
+                    isLoading={loading}
+                >
+                    {renderContent()}
+                </Layout>
+            )}
+        </SecurityProvider>
     );
 }

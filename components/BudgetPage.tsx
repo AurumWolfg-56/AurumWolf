@@ -2,13 +2,14 @@
 import React, { useState } from 'react';
 import {
     PieChart, Edit2, Plus, Check, Target, AlertTriangle, Activity, Trophy, Landmark,
-    Wallet, DollarSign, X, TrendingUp, TrendingDown
+    Wallet, DollarSign, X, TrendingUp, TrendingDown, Scale
 } from 'lucide-react';
-import { BudgetCategory, SavingsGoal } from '../types';
+import { BudgetCategory, SavingsGoal, Account } from '../types';
 import { GoalForm } from './GoalForm';
 import { BudgetForm } from './BudgetForm';
 import { formatCurrency } from '../lib/money';
-import { ICON_MAP } from '../constants';
+import { getIconComponent } from '../lib/iconMapper';
+import { useAccounts } from '../contexts/AccountsContext';
 
 // --- SUB COMPONENTS ---
 
@@ -20,13 +21,14 @@ import { Transaction } from '../types';
 interface BudgetDetailModalProps {
     item: BudgetCategory;
     transactions: Transaction[];
+    accounts: Account[];
     currencyCode: string;
     onClose: () => void;
     privacyMode: boolean;
     t: (key: string) => string;
 }
 
-const BudgetDetailModal: React.FC<BudgetDetailModalProps> = ({ item, transactions, currencyCode, onClose, privacyMode, t }) => {
+const BudgetDetailModal: React.FC<BudgetDetailModalProps> = ({ item, transactions, accounts, currencyCode, onClose, privacyMode, t }) => {
     // 1. Get Matching Transactions
     const mappedCategories = getCategoriesForBudget(item.category);
     const relevantTransactions = transactions.filter(t =>
@@ -85,8 +87,10 @@ const BudgetDetailModal: React.FC<BudgetDetailModalProps> = ({ item, transaction
                 {/* Header */}
                 <div className="p-6 border-b border-platinum-200 dark:border-neutral-800 flex items-center justify-between shrink-0">
                     <div className="flex items-center gap-3">
-                        <div className={`p-3 rounded-xl ${isOverBudget ? 'bg-red-500/10 text-red-500' : 'bg-emerald-500/10 text-emerald-500'}`}>
-                            {item.icon && typeof item.icon === 'string' && ICON_MAP[item.icon] ? React.createElement(ICON_MAP[item.icon], { size: 24 }) : <Wallet size={24} />}
+                        <div className={`p-3 rounded-xl shadow-lg text-white ${isOverBudget ? 'bg-red-500 shadow-red-900/20' :
+                            (item.color || 'bg-emerald-500')
+                            }`}>
+                            {React.createElement(getIconComponent(item.icon_key), { size: 24 })}
                         </div>
                         <div>
                             <h2 className="text-xl font-bold text-neutral-900 dark:text-white">{item.category}</h2>
@@ -164,7 +168,7 @@ const BudgetDetailModal: React.FC<BudgetDetailModalProps> = ({ item, transaction
                                             </div>
                                             <div>
                                                 <p className="text-sm font-bold text-neutral-900 dark:text-white line-clamp-1">{tx.description}</p>
-                                                <p className="text-[10px] text-neutral-500">{tx.accountName}</p>
+                                                <p className="text-[10px] text-neutral-500">{accounts.find(a => a.id === tx.accountId)?.name || 'Unknown'}</p>
                                             </div>
                                         </div>
                                         <span className={`font-mono font-bold text-sm ${tx.type === 'credit' ? 'text-emerald-500' : 'text-neutral-900 dark:text-white'}`}>
@@ -201,12 +205,8 @@ interface BudgetCardProps {
 const BudgetCard: React.FC<BudgetCardProps> = ({ item, spent, isEditing, onEditClick, onClick, privacyMode, currencyCode, t }) => {
     const isIncome = item.type === 'income';
     // Safe Icon Resolution
-    let Icon = Wallet;
-    if (typeof item.icon === 'string' && ICON_MAP[item.icon]) {
-        Icon = ICON_MAP[item.icon];
-    } else if (typeof item.icon === 'function') {
-        Icon = item.icon;
-    }
+    // Safe Icon Resolution
+    const Icon = getIconComponent(item.icon_key);
 
 
     // --- PACING LOGIC ---
@@ -264,6 +264,7 @@ const BudgetCard: React.FC<BudgetCardProps> = ({ item, spent, isEditing, onEditC
             // For now, simple "Within Budget"
             statusLabel = t('budget.withinBudget');
             statusColor = 'text-emerald-500';
+            // Use the category color properly!
             progressBarColor = item.color;
         }
     }
@@ -292,11 +293,9 @@ const BudgetCard: React.FC<BudgetCardProps> = ({ item, spent, isEditing, onEditC
             {/* Top Section: Icon & Category & STATUS */}
             <div className="flex justify-between items-start mb-4 relative z-10">
                 <div className="flex items-center gap-3 overflow-hidden">
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors shadow-lg shrink-0 ${isOverLimit
-                        ? 'bg-red-500/10 text-red-500 shadow-red-900/20'
-                        : isTargetMet
-                            ? 'bg-emerald-500/10 text-emerald-500 shadow-emerald-900/20'
-                            : 'bg-platinum-100 dark:bg-neutral-800 text-neutral-400 group-hover:text-neutral-900 dark:group-hover:text-white'
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors shadow-lg shrink-0 text-white ${isOverLimit ? 'bg-red-500 shadow-red-900/20' :
+                        isTargetMet ? 'bg-emerald-500 shadow-emerald-900/20' :
+                            (item.color || 'bg-neutral-800')
                         }`}>
                         <Icon size={24} />
                     </div>
@@ -399,10 +398,11 @@ interface GoalCardProps {
 
 const GoalCard: React.FC<GoalCardProps> = ({ goal, isEditing, onEditClick, onDepositClick, privacyMode, currencyCode, t }) => {
     // Safe Icon Resolution
+    // Safe Icon Resolution
     let Icon = Trophy;
-    if (typeof goal.icon === 'string' && ICON_MAP[goal.icon]) {
-        Icon = ICON_MAP[goal.icon];
-    } else if (typeof goal.icon === 'function') {
+    if (typeof goal.icon === 'string') {
+        Icon = getIconComponent(goal.icon);
+    } else if (typeof goal.icon === 'function' || typeof goal.icon === 'object') {
         Icon = goal.icon;
     }
 
@@ -510,16 +510,17 @@ export const BudgetPage: React.FC<BudgetPageProps> = ({
     baseCurrency = 'USD',
     t
 }) => {
+    const { accounts } = useAccounts();
     const [isEditing, setIsEditing] = useState(false);
-    const [activeBudgetModal, setActiveBudgetModal] = useState<BudgetCategory | 'new' | null>(null);
+    const [activeBudgetModal, setActiveBudgetModal] = useState<{ mode: 'budget' | 'category'; data: BudgetCategory | 'new' } | null>(null);
     const [activeGoalModal, setActiveGoalModal] = useState<SavingsGoal | 'new' | null>(null);
     const [detailModalItem, setDetailModalItem] = useState<BudgetCategory | null>(null); // New State
     const [depositGoalId, setDepositGoalId] = useState<string | null>(null);
     const [depositAmount, setDepositAmount] = useState('');
 
-    // Split into Income and Expense based on props
-    const incomeBudgets = budgets.filter(b => b.type === 'income');
-    const expenseBudgets = budgets.filter(b => b.type !== 'income');
+    // FILTER: Only show active budgets (limit > 0) OR if user is in "Manage Categories" mode (editing)
+    const incomeBudgets = budgets.filter(b => b.type === 'income' && (b.limit > 0 || isEditing));
+    const expenseBudgets = budgets.filter(b => b.type !== 'income' && (b.limit > 0 || isEditing));
 
     // Totals
     const totalIncome = incomeBudgets.reduce((acc, b) => acc + b.spent, 0);
@@ -529,12 +530,12 @@ export const BudgetPage: React.FC<BudgetPageProps> = ({
 
     // Handlers
     const handleSaveBudget = (b: BudgetCategory) => {
-        const cleanBudget = { ...b, spent: 0 };
-
-        if (activeBudgetModal === 'new') {
+        if (activeBudgetModal?.data === 'new') {
+            const cleanBudget = { ...b, spent: 0 };
             onAddBudget?.(cleanBudget);
         } else {
-            onUpdateBudget(cleanBudget);
+            // Preserve existing spent amount if updating
+            onUpdateBudget(b);
         }
         setActiveBudgetModal(null);
     };
@@ -577,7 +578,7 @@ export const BudgetPage: React.FC<BudgetPageProps> = ({
                     <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity"><Activity size={80} className="text-neutral-900 dark:text-white" /></div>
                     <div className="relative z-10">
                         <div className="flex items-center gap-2 mb-2">
-                            <div className="p-2 bg-platinum-100 dark:bg-neutral-950 rounded-lg text-gold-500 border border-platinum-200 dark:border-neutral-800"><ScaleIcon /></div>
+                            <div className="p-2 bg-platinum-100 dark:bg-neutral-950 rounded-lg text-gold-500 border border-platinum-200 dark:border-neutral-800"><Scale /></div>
                             <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider">{t('budget.netCashFlow')}</span>
                         </div>
                         <h3 className={`text-3xl font-display font-bold ${netSavings >= 0 ? 'text-neutral-900 dark:text-white' : 'text-red-500'}`}>
@@ -621,23 +622,36 @@ export const BudgetPage: React.FC<BudgetPageProps> = ({
                 </h2>
                 <div className="flex gap-2">
                     <button
-                        onClick={() => setActiveBudgetModal('new')}
-                        className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all bg-platinum-100 dark:bg-neutral-800 text-neutral-900 dark:text-white hover:bg-platinum-200 dark:hover:bg-neutral-700"
+                        onClick={() => setActiveBudgetModal({ mode: 'budget', data: 'new' })} // Explicitly use mode
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all bg-gold-500 text-neutral-950 hover:bg-gold-400 shadow-lg hover:shadow-gold-500/20"
                     >
                         <Plus size={14} /> {t('common.add')}
                     </button>
                     <button
                         onClick={() => setIsEditing(!isEditing)}
                         className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all border ${isEditing
-                            ? 'bg-gold-500 text-neutral-950 border-gold-500 hover:bg-gold-400'
-                            : 'bg-white dark:bg-neutral-900 text-neutral-400 border-platinum-200 dark:border-neutral-800 hover:text-neutral-900 dark:hover:text-white hover:border-platinum-300 dark:hover:border-neutral-600'
+                            ? 'bg-neutral-900 text-white border-neutral-900 dark:bg-white dark:text-neutral-900'
+                            : 'bg-white dark:bg-neutral-900 text-neutral-400 border-platinum-200 dark:border-neutral-800 hover:text-neutral-900 dark:hover:text-white'
                             }`}
                     >
                         {isEditing ? <Check size={14} /> : <Edit2 size={14} />}
-                        {isEditing ? t('budget.doneEditing') : t('budget.editStructure')}
+                        {isEditing ? t('budget.doneEditing') : "Manage Categories"}
                     </button>
                 </div>
             </div>
+
+            {/* Editing Config Hint */}
+            {isEditing && (
+                <div className="flex items-center justify-center -mt-2 mb-6 animate-pulse">
+                    <button
+                        onClick={() => setActiveBudgetModal({ mode: 'category', data: 'new' })}
+                        className="bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 px-4 py-2 rounded-full text-xs font-bold flex items-center gap-2 hover:scale-105 transition-transform border border-purple-200 dark:border-purple-800"
+                    >
+                        <Plus size={14} /> Create Custom Category
+                    </button>
+                </div>
+            )}
+
 
             {/* --- GOALS SECTION --- */}
             <div className="space-y-4">
@@ -692,7 +706,7 @@ export const BudgetPage: React.FC<BudgetPageProps> = ({
                             item={item}
                             spent={item.spent}
                             isEditing={isEditing}
-                            onEditClick={(b) => setActiveBudgetModal(b)}
+                            onEditClick={(b) => setActiveBudgetModal({ mode: 'category', data: b })}
                             onClick={(b) => setDetailModalItem(b)}
                             privacyMode={privacyMode}
                             currencyCode={baseCurrency}
@@ -701,7 +715,7 @@ export const BudgetPage: React.FC<BudgetPageProps> = ({
                     ))}
                     {isEditing && (
                         <button
-                            onClick={() => setActiveBudgetModal('new')}
+                            onClick={() => setActiveBudgetModal({ mode: 'category', data: 'new' })}
                             className="rounded-2xl border-2 border-dashed border-platinum-300 dark:border-neutral-800 flex flex-col items-center justify-center gap-3 text-neutral-400 dark:text-neutral-600 hover:text-gold-500 dark:hover:text-gold-500 hover:border-gold-500/50 hover:bg-platinum-50 dark:hover:bg-neutral-900/50 transition-all min-h-[150px]"
                         >
                             <Plus size={24} />
@@ -723,7 +737,7 @@ export const BudgetPage: React.FC<BudgetPageProps> = ({
                             item={item}
                             spent={item.spent}
                             isEditing={isEditing}
-                            onEditClick={(b) => setActiveBudgetModal(b)}
+                            onEditClick={(b) => setActiveBudgetModal({ mode: 'category', data: b })}
                             onClick={(b) => setDetailModalItem(b)}
                             privacyMode={privacyMode}
                             currencyCode={baseCurrency}
@@ -734,67 +748,77 @@ export const BudgetPage: React.FC<BudgetPageProps> = ({
             </div>
 
             {/* --- MODALS --- */}
-            {activeBudgetModal && (
-                <BudgetForm
-                    initialData={activeBudgetModal === 'new' ? null : activeBudgetModal}
-                    onSave={handleSaveBudget}
-                    onDelete={handleDeleteBudgetHandler}
-                    onCancel={() => setActiveBudgetModal(null)}
-                />
-            )}
+            {
+                activeBudgetModal && (
+                    <BudgetForm
+                        initialData={activeBudgetModal.data === 'new' ? null : activeBudgetModal.data}
+                        mode={activeBudgetModal.mode}
+                        onSave={handleSaveBudget}
+                        onDelete={handleDeleteBudgetHandler}
+                        onCancel={() => setActiveBudgetModal(null)}
+                    />
+                )
+            }
 
-            {activeGoalModal && (
-                <GoalForm
-                    initialData={activeGoalModal === 'new' ? null : activeGoalModal}
-                    onSave={handleSaveGoal}
-                    onDelete={handleDeleteGoalHandler}
-                    onCancel={() => setActiveGoalModal(null)}
-                />
-            )}
+            {
+                activeGoalModal && (
+                    <GoalForm
+                        initialData={activeGoalModal === 'new' ? null : activeGoalModal}
+                        onSave={handleSaveGoal}
+                        onDelete={handleDeleteGoalHandler}
+                        onCancel={() => setActiveGoalModal(null)}
+                    />
+                )
+            }
 
             {/* DEPOSIT MODAL */}
-            {depositGoalId && (
-                <div className="fixed inset-0 z-[80] bg-neutral-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-neutral-900 border border-platinum-200 dark:border-neutral-800 rounded-3xl p-6 w-full max-w-sm shadow-2xl animate-fade-in relative">
-                        <button onClick={() => setDepositGoalId(null)} className="absolute top-4 right-4 text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors">
-                            <X size={20} />
-                        </button>
-                        <h3 className="text-lg font-bold text-neutral-900 dark:text-white mb-4">{t('budget.addFunds')}</h3>
-                        <form onSubmit={handleExecuteDeposit}>
-                            <label className="block text-xs font-bold text-neutral-500 mb-2 uppercase">{t('common.amount')}</label>
-                            <div className="relative mb-6">
-                                <DollarSign size={16} className="absolute left-3 top-3.5 text-neutral-500" />
-                                <input
-                                    type="number"
-                                    value={depositAmount}
-                                    onChange={(e) => setDepositAmount(e.target.value)}
-                                    className="w-full bg-platinum-50 dark:bg-neutral-950 border border-platinum-200 dark:border-neutral-800 text-neutral-900 dark:text-white text-lg font-bold rounded-xl p-3 pl-9 outline-none focus:border-gold-500"
-                                    placeholder="0.00"
-                                    autoFocus
-                                />
-                                <span className="absolute right-3 top-3.5 text-xs text-neutral-500 font-bold">{baseCurrency}</span>
-                            </div>
-                            <button type="submit" disabled={!depositAmount} className="w-full py-3 bg-gold-500 text-neutral-950 font-bold rounded-xl hover:bg-gold-400 disabled:opacity-50 transition-all">
-                                {t('budget.confirmDeposit')}
+            {
+                depositGoalId && (
+                    <div className="fixed inset-0 z-[80] bg-neutral-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+                        <div className="bg-white dark:bg-neutral-900 border border-platinum-200 dark:border-neutral-800 rounded-3xl p-6 w-full max-w-sm shadow-2xl animate-fade-in relative">
+                            <button onClick={() => setDepositGoalId(null)} className="absolute top-4 right-4 text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors">
+                                <X size={20} />
                             </button>
-                        </form>
+                            <h3 className="text-lg font-bold text-neutral-900 dark:text-white mb-4">{t('budget.addFunds')}</h3>
+                            <form onSubmit={handleExecuteDeposit}>
+                                <label className="block text-xs font-bold text-neutral-500 mb-2 uppercase">{t('common.amount')}</label>
+                                <div className="relative mb-6">
+                                    <DollarSign size={16} className="absolute left-3 top-3.5 text-neutral-500" />
+                                    <input
+                                        type="number"
+                                        value={depositAmount}
+                                        onChange={(e) => setDepositAmount(e.target.value)}
+                                        className="w-full bg-platinum-50 dark:bg-neutral-950 border border-platinum-200 dark:border-neutral-800 text-neutral-900 dark:text-white text-lg font-bold rounded-xl p-3 pl-9 outline-none focus:border-gold-500"
+                                        placeholder="0.00"
+                                        autoFocus
+                                    />
+                                    <span className="absolute right-3 top-3.5 text-xs text-neutral-500 font-bold">{baseCurrency}</span>
+                                </div>
+                                <button type="submit" disabled={!depositAmount} className="w-full py-3 bg-gold-500 text-neutral-950 font-bold rounded-xl hover:bg-gold-400 disabled:opacity-50 transition-all">
+                                    {t('budget.confirmDeposit')}
+                                </button>
+                            </form>
+                        </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* DETAIL MODAL */}
-            {detailModalItem && (
-                <BudgetDetailModal
-                    item={detailModalItem}
-                    transactions={transactions}
-                    currencyCode={baseCurrency}
-                    onClose={() => setDetailModalItem(null)}
-                    privacyMode={privacyMode}
-                    t={t}
-                />
-            )}
+            {
+                detailModalItem && (
+                    <BudgetDetailModal
+                        item={detailModalItem}
+                        transactions={transactions}
+                        accounts={accounts}
+                        currencyCode={baseCurrency}
+                        onClose={() => setDetailModalItem(null)}
+                        privacyMode={privacyMode}
+                        t={t}
+                    />
+                )
+            }
 
-        </div>
+        </div >
     );
 };
 

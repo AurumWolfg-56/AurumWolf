@@ -118,7 +118,7 @@ export const InvestmentsPage: React.FC<InvestmentsPageProps> = ({
     baseCurrency,
     t
 }) => {
-    const { investments, addInvestment, updateInvestment, deleteInvestment, error: contextError } = useInvestments();
+    const { investments, addInvestment, updateInvestment, deleteInvestment, refreshRealTimeQuotes, loading, error: contextError } = useInvestments();
 
     const [strategyFilter, setStrategyFilter] = useState<'all' | 'active' | 'passive'>('all');
     const [isFormOpen, setIsFormOpen] = useState(false);
@@ -250,19 +250,30 @@ export const InvestmentsPage: React.FC<InvestmentsPageProps> = ({
                     </h1>
                 </div>
 
-                <div className="flex bg-white/60 dark:bg-neutral-800/60 backdrop-blur-md rounded-xl p-1 border border-white/20 dark:border-white/5">
-                    {['all', 'passive', 'active'].map((filter) => (
-                        <button
-                            key={filter}
-                            onClick={() => setStrategyFilter(filter as any)}
-                            className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${strategyFilter === filter
-                                ? 'bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white shadow-sm'
-                                : 'text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'
-                                }`}
-                        >
-                            {filter === 'all' ? 'All Assets' : filter === 'passive' ? t('investments.passive') : t('investments.active')}
-                        </button>
-                    ))}
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => refreshRealTimeQuotes()}
+                        disabled={loading}
+                        className="p-2 rounded-xl bg-white/60 dark:bg-neutral-800/60 border border-white/20 dark:border-white/5 text-neutral-500 hover:text-gold-500 transition-colors disabled:opacity-50"
+                        title="Simulate Real-Time Market Update"
+                    >
+                        <Activity size={20} className={loading ? "animate-spin" : ""} />
+                    </button>
+
+                    <div className="flex bg-white/60 dark:bg-neutral-800/60 backdrop-blur-md rounded-xl p-1 border border-white/20 dark:border-white/5">
+                        {['all', 'passive', 'active'].map((filter) => (
+                            <button
+                                key={filter}
+                                onClick={() => setStrategyFilter(filter as any)}
+                                className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${strategyFilter === filter
+                                    ? 'bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white shadow-sm'
+                                    : 'text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'
+                                    }`}
+                            >
+                                {filter === 'all' ? 'All Assets' : filter === 'passive' ? t('investments.passive') : t('investments.active')}
+                            </button>
+                        ))}
+                    </div>
                 </div>
             </div>
 

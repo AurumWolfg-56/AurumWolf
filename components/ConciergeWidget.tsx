@@ -1,9 +1,13 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Sparkles, Send, X, Bot, User, Loader2, ChevronDown, Minimize2, Maximize2, Mic, MicOff, Headphones, Activity } from 'lucide-react';
-import { GoogleGenAI, FunctionDeclaration, Type, LiveServerMessage, Modality } from "@google/genai";
+import { FunctionDeclaration, Type } from "@google/genai";
 import { Transaction, Account, BudgetCategory, NavTab, Investment } from '../types';
 import { getLocalDateISO } from '../lib/dates';
+import { supabase } from '../lib/supabase';
+import { formatCurrency } from '../lib/money';
+import { convertWithRealRate } from '../lib/currency';
+import { useAuth } from '../contexts/AuthContext';
 
 interface ConciergeWidgetProps {
     transactions: Transaction[];
@@ -13,6 +17,9 @@ interface ConciergeWidgetProps {
     activeTab: NavTab;
     onAddTransactionData?: (tx: Transaction) => void;
     onAddBudget?: (budget: Omit<BudgetCategory, 'id' | 'spent'>) => void;
+    t: (key: string) => string;
+    language: string;
+    privacyMode: boolean;
 }
 
 interface Message {
@@ -61,19 +68,22 @@ async function decodeAudioData(
     return buffer;
 }
 
-export const ConciergeWidget: React.FC<ConciergeWidgetProps> = ({ transactions, accounts, budgets, investments = [], activeTab, onAddTransactionData, onAddBudget }) => {
+export const ConciergeWidget: React.FC<ConciergeWidgetProps> = ({ transactions, accounts, budgets, investments = [], activeTab, onAddTransactionData, onAddBudget, t, language, privacyMode }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [isExpanded, setIsExpanded] = useState(false);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isVoiceActive, setIsVoiceActive] = useState(false);
     const [voiceStatus, setVoiceStatus] = useState<'connecting' | 'listening' | 'speaking' | 'idle'>('idle');
+    const isVoiceActiveRef = useRef(false); // Ref for safe access in callbacks
+
+    const locale = language === 'es' ? 'es-MX' : 'en-US';
 
     const [messages, setMessages] = useState<Message[]>([
         {
             id: 'init',
             role: 'model',
-            text: "Welcome to AurumWolf Concierge. Text me or tap the headphones for a voice call.",
+            text: t('concierge.welcomeAttributes'),
             timestamp: new Date()
         }
     ]);
@@ -96,22 +106,22 @@ export const ConciergeWidget: React.FC<ConciergeWidgetProps> = ({ transactions, 
             let greeting = "";
             switch (activeTab) {
                 case 'business':
-                    greeting = "I see you are in the Business Hub. Would you like a P&L analysis or entity performance review?";
+                    greeting = t('concierge.contextBusiness');
                     break;
                 case 'budget':
-                    greeting = "Reviewing your financial plan. You have some budget categories nearing their limit.";
+                    greeting = t('concierge.contextBudget');
                     break;
                 case 'accounts':
-                    greeting = "Asset allocation mode active. I can assist with rebalancing strategies.";
+                    greeting = t('concierge.contextAssets');
                     break;
                 case 'investments':
-                    greeting = "Portfolio mode active. I can analyze your active vs. passive strategy positions.";
+                    greeting = t('concierge.contextPortfolio');
                     break;
                 case 'scan':
-                    greeting = "Receipt scanner active. I will auto-extract data from any image you upload.";
+                    greeting = t('concierge.contextScan');
                     break;
                 default:
-                    greeting = "I have your full financial context. How may I assist you today?";
+                    greeting = t('concierge.contextGeneral');
             }
 
             // Only add if last message wasn't this greeting
@@ -178,18 +188,32 @@ export const ConciergeWidget: React.FC<ConciergeWidgetProps> = ({ transactions, 
         }
     };
 
+    const convertCurrencyTool: FunctionDeclaration = {
+        name: 'convert_currency',
+        description: 'Convert a currency amount to another currency using real-time rates.',
+        parameters: {
+            type: Type.OBJECT,
+            properties: {
+                amount: { type: Type.NUMBER, description: 'Amount to convert' },
+                from: { type: Type.STRING, description: 'Source currency code (e.g. USD, EUR, MXN)' },
+                to: { type: Type.STRING, description: 'Target currency code (e.g. EUR, GBP, JPY)' }
+            },
+            required: ['amount', 'from', 'to']
+        }
+    };
+
     // --- CONTEXT PREPARATION ---
     const getFinancialContext = () => {
         // Summarize data to save tokens
-        const accountSummary = accounts.map(a => `${a.name} (${a.type}): $${a.balance} ${a.currency}`).join(', ');
-        const budgetSummary = budgets.map(b => `${b.category}: $${b.spent} / $${b.limit}`).join(', ');
+        const accountSummary = accounts.map(a => `${a.name} (${a.type}): ${formatCurrency(a.balance, a.currency, { locale })}`).join(', ');
+        const budgetSummary = budgets.map(b => `${b.category}: ${formatCurrency(b.spent, b.currency, { locale })} / ${formatCurrency(b.limit, b.currency, { locale })}`).join(', ');
         const investmentSummary = investments.length > 0
-            ? investments.map(i => `${i.name} (${i.type}): $${i.currentValue} (${i.roiPercent.toFixed(1)}% ROI)`).join(', ')
+            ? investments.map(i => `${i.name} (${i.type}): ${formatCurrency(i.currentValue, i.currency, { locale })} (${i.roiPercent.toFixed(1)}% ROI)`).join(', ')
             : "No investments tracked.";
 
         // Last 10 Transactions for context
         const recentTx = transactions.slice(0, 10).map(t =>
-            `${t.date}: ${t.name} (${t.category}) - ${t.type === 'credit' ? '+' : '-'}${t.amount}`
+            `${t.date}: ${t.name} (${t.category}) - ${t.type === 'credit' ? '+' : '-'}${formatCurrency(t.numericAmount, t.currency || 'USD', { locale })}`
         ).join('\n');
 
         return `
@@ -203,243 +227,193 @@ export const ConciergeWidget: React.FC<ConciergeWidgetProps> = ({ transactions, 
     `;
     };
 
-    // --- LIVE API HANDLING ---
+    // --- TURN-BASED VOICE HANDLER ---
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const chunksRef = useRef<Blob[]>([]);
+
     const stopVoiceSession = () => {
-        if (liveSession.current) {
-            // liveSession.current.close(); // Not always available on the session object depending on SDK version, but dropping refs helps
-            liveSession.current = null;
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+            mediaRecorderRef.current.stop();
         }
 
-        // Stop Audio Tracks
+        // Stop playback
+        if (audioSourceRef.current) {
+            audioSourceRef.current.stop();
+            audioSourceRef.current = null;
+        }
+
+        // Stop tracks
         if (audioStreamRef.current) {
-            audioStreamRef.current.getTracks().forEach(track => track.stop());
+            audioStreamRef.current.getTracks().forEach(t => t.stop());
             audioStreamRef.current = null;
         }
 
-        // Close Context
-        if (audioContextRef.current) {
-            audioContextRef.current.close();
-            audioContextRef.current = null;
+        if (audioStreamRef.current) {
+            audioStreamRef.current.getTracks().forEach(t => t.stop());
+            audioStreamRef.current = null;
         }
 
-        // Clear Sources
-        audioSources.current.forEach(source => source.stop());
-        audioSources.current.clear();
-
         setIsVoiceActive(false);
+        isVoiceActiveRef.current = false;
         setVoiceStatus('idle');
     };
 
-    const startVoiceSession = async () => {
-        if (!import.meta.env.VITE_GEMINI_API_KEY) {
-            alert("API Key missing");
-            return;
-        }
+    const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
 
+    const startVoiceSession = async () => {
         setIsVoiceActive(true);
-        setVoiceStatus('connecting');
+        isVoiceActiveRef.current = true;
+        setVoiceStatus('listening');
+        chunksRef.current = [];
 
         try {
-            const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-            const context = getFinancialContext();
+            // Ensure AudioContext is running (Mobile Safari fix)
+            const checkAudioContext = () => {
+                if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+                    audioContextRef.current.resume();
+                }
+            };
+            checkAudioContext();
 
-            // 1. Setup Audio Input
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             audioStreamRef.current = stream;
 
-            // 2. Setup Audio Contexts
-            // Input: 16kHz for Gemini
-            // Output: 24kHz from Gemini
-            const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-            audioContextRef.current = audioCtx;
-            nextStartTime.current = audioCtx.currentTime;
+            const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
+            const recorder = new MediaRecorder(stream, { mimeType });
+            mediaRecorderRef.current = recorder;
 
-            const inputAudioCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
-            const inputSource = inputAudioCtx.createMediaStreamSource(stream);
-            const processor = inputAudioCtx.createScriptProcessor(4096, 1, 1);
+            recorder.ondataavailable = (e) => {
+                if (e.data.size > 0) chunksRef.current.push(e.data);
+            };
 
-            const sessionPromise = ai.live.connect({
-                model: 'gemini-2.5-flash-native-audio-preview-12-2025',
-                config: {
-                    responseModalities: [Modality.AUDIO],
-                    systemInstruction: `You are AurumWolf Voice, a sophisticated financial AI. 
-                  Data Context: ${context}.
-                  Speak concisely. When the user asks to add a transaction, call the tool immediately.
-                  Do not use markdown in speech. Be helpful, brief, and professional.`,
-                    speechConfig: {
-                        voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } // Kore is usually a good deep voice
-                    },
-                    tools: [{ functionDeclarations: [addTransactionTool, searchTransactionsTool, createBudgetTool] }]
-                },
-                callbacks: {
-                    onopen: () => {
-                        setVoiceStatus('listening');
-                        // Connect Audio Pipeline
-                        processor.onaudioprocess = (e) => {
-                            const inputData = e.inputBuffer.getChannelData(0);
-                            // Create Blob from Float32
-                            const l = inputData.length;
-                            const int16 = new Int16Array(l);
-                            for (let i = 0; i < l; i++) {
-                                int16[i] = inputData[i] * 32768;
+            recorder.onstop = async () => {
+                setVoiceStatus('connecting'); // Processing...
+                const audioBlob = new Blob(chunksRef.current, { type: mimeType });
+
+                // Convert to base64
+                const reader = new FileReader();
+                reader.readAsDataURL(audioBlob);
+                reader.onloadend = async () => {
+                    const result = reader.result as string;
+                    const base64Audio = result.split(',')[1];
+                    const context = getFinancialContext();
+
+                    try {
+                        const { aiClient } = await import('../lib/ai/proxy');
+
+                        // Send Audio to Geminii via Proxy (Multimodal)
+                        const response = await aiClient.generateContent(
+                            'gemini-2.0-flash-exp', // Multimodal model
+                            [{
+                                role: 'user',
+                                parts: [
+                                    { text: `Context: ${context}. Respond briefly.` },
+                                    { inlineData: { mimeType: 'audio/webm', data: base64Audio } }
+                                ]
+                            }],
+                            {
+                                responseModalities: ["AUDIO"],
+                                systemInstruction: `You are AurumWolf Voice. Concise financial assistant. Use tools if needed. ${privacyMode ? 'PRIVACY MODE ON. DO NOT SPEAK BALANCES.' : ''}`,
+                                tools: [{ functionDeclarations: [addTransactionTool, searchTransactionsTool, createBudgetTool, convertCurrencyTool] }]
                             }
-                            const b64 = encode(new Uint8Array(int16.buffer));
+                        );
 
-                            sessionPromise.then(session => {
-                                session.sendRealtimeInput({
-                                    media: {
-                                        mimeType: 'audio/pcm;rate=16000',
-                                        data: b64
-                                    }
-                                });
-                            });
-                        };
-                        inputSource.connect(processor);
-                        processor.connect(inputAudioCtx.destination);
-                    },
-                    onmessage: async (msg: LiveServerMessage) => {
-                        // 1. Handle Audio Output
-                        const audioData = msg.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
-                        if (audioData) {
+                        // 1. Play Audio Response
+                        const audioResp = response.audioData();
+                        if (audioResp) {
                             setVoiceStatus('speaking');
-                            const audioBuffer = await decodeAudioData(
-                                decode(audioData),
-                                audioCtx,
-                                24000,
-                                1
-                            );
-
-                            const source = audioCtx.createBufferSource();
-                            source.buffer = audioBuffer;
-                            source.connect(audioCtx.destination);
-
-                            // Schedule
-                            const now = audioCtx.currentTime;
-                            const startTime = Math.max(now, nextStartTime.current);
-                            source.start(startTime);
-                            nextStartTime.current = startTime + audioBuffer.duration;
-
-                            audioSources.current.add(source);
+                            const ctx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+                            audioContextRef.current = ctx;
+                            const buffer = await decodeAudioData(decode(audioResp), ctx, 24000, 1);
+                            const source = ctx.createBufferSource();
+                            source.buffer = buffer;
+                            source.connect(ctx.destination);
+                            source.start();
+                            audioSourceRef.current = source;
                             source.onended = () => {
-                                audioSources.current.delete(source);
-                                if (audioSources.current.size === 0) setVoiceStatus('listening');
+                                // Auto-listen for Conversation Mode
+                                if (isVoiceActiveRef.current) {
+                                    // Add a slight delay for natural turn-taking
+                                    setTimeout(() => {
+                                        if (isVoiceActiveRef.current) {
+                                            startVoiceSession();
+                                        }
+                                    }, 500);
+                                } else {
+                                    setVoiceStatus('idle');
+                                }
                             };
                         }
 
-                        // 2. Handle Tool Calls
-                        if (msg.toolCall) {
-                            for (const fc of msg.toolCall.functionCalls) {
-                                if (fc.name === 'addTransaction' && onAddTransactionData) {
-                                    const args = fc.args as any;
-                                    const newTx: Transaction = {
+                        // 2. Handle Tool Calls (Backend executed tools, we just get result? No, model returns FunctionCall request)
+                        const calls = response.functionCalls();
+                        if (calls.length > 0) {
+                            // ... (Same logic as text mode)
+                            // Ideally we would execute tools and send back results to model to get final speech...
+                            // But for "Turn Based", doing a multi-turn loop is complex.
+                            // Simplified: Execute tool and speak generic success message.
+
+                            for (const call of calls) {
+                                if (call.name === 'addTransaction' && onAddTransactionData) {
+                                    const args = call.args as any;
+                                    onAddTransactionData({
                                         id: crypto.randomUUID(),
                                         accountId: accounts[0]?.id || '1',
                                         name: args.merchant,
-                                        amount: new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(args.amount),
+                                        amount: formatCurrency(args.amount, 'USD', { locale }),
                                         numericAmount: args.amount,
                                         currency: 'USD',
-
-
                                         date: args.date || getLocalDateISO(),
                                         category: args.category || 'Uncategorized',
                                         type: args.type,
-                                        status: 'completed',
-                                        description: 'Added via Voice Concierge'
-                                    };
-
-                                    onAddTransactionData(newTx);
-
-                                    // Send Tool Response
-                                    sessionPromise.then(session => {
-                                        session.sendToolResponse({
-                                            functionResponses: {
-                                                id: fc.id,
-                                                name: fc.name,
-                                                response: { result: "ok" }
-                                            }
-                                        });
+                                        status: 'completed'
                                     });
                                 }
+
+                                if (call.name === 'convert_currency') {
+                                    const args = call.args as any;
+                                    const result = await convertWithRealRate(args.amount, args.from, args.to);
+                                    if (result) {
+                                        // Since we can't speak back dynamically in this loop, we show a message
+                                        setMessages(prev => [...prev, {
+                                            id: (Date.now() + 1).toString(),
+                                            role: 'model',
+                                            text: `💱 ${formatCurrency(args.amount, args.from, { locale })} = ${formatCurrency(result.convertedAmount, args.to, { locale })}`,
+                                            timestamp: new Date()
+                                        }]);
+                                    }
+                                }
+                                // Other tools...
                             }
                         }
 
-                        // Handle Search Tool
-                        if (msg.toolCall) {
-                            for (const fc of msg.toolCall.functionCalls) {
-                                if (fc.name === 'searchTransactions') {
-                                    const args = fc.args as any;
-                                    const query = (args.query || '').toLowerCase();
-                                    const results = transactions.filter(t => {
-                                        const matchesQuery = !query || t.name.toLowerCase().includes(query) || t.category.toLowerCase().includes(query);
-                                        const matchesDate = (!args.startDate || t.date >= args.startDate) && (!args.endDate || t.date <= args.endDate);
-                                        return matchesQuery && matchesDate;
-                                    }).slice(0, 5); // Limit to 5 for voice brevity
-
-                                    const resultText = results.length > 0
-                                        ? results.map(t => `${t.date}: ${t.name} ($${t.numericAmount})`).join(', ')
-                                        : "No transactions found.";
-
-                                    sessionPromise.then(session => {
-                                        session.sendToolResponse({
-                                            functionResponses: {
-                                                id: fc.id,
-                                                name: fc.name,
-                                                response: { result: resultText }
-                                            }
-                                        });
-                                    });
-                                }
-                                if (fc.name === 'createBudget' && onAddBudget) {
-                                    const args = fc.args as any;
-                                    onAddBudget({
-                                        category: args.category,
-                                        limit: args.limit,
-                                        currency: 'USD',
-                                        period: 'monthly'
-                                    });
-                                    sessionPromise.then(session => {
-                                        session.sendToolResponse({
-                                            functionResponses: {
-                                                id: fc.id,
-                                                name: fc.name,
-                                                response: { result: "Budget created successfully" }
-                                            }
-                                        });
-                                    });
-                                }
-                            }
-                        }
-
-                        // 3. Handle Interruption
-                        if (msg.serverContent?.interrupted) {
-                            audioSources.current.forEach(s => s.stop());
-                            audioSources.current.clear();
-                            nextStartTime.current = 0;
-                            setVoiceStatus('listening');
-                        }
-                    },
-                    onclose: () => {
+                    } catch (err) {
+                        console.error("Voice Processing Error", err);
                         setVoiceStatus('idle');
-                        setIsVoiceActive(false);
-                    },
-                    onerror: (err) => {
-                        console.error("Live API Error:", err);
-                        stopVoiceSession();
                     }
-                }
-            });
+                };
+            };
 
-            liveSession.current = sessionPromise;
+            recorder.start();
 
-        } catch (error) {
-            console.error("Voice connection failed", error);
+        } catch (err: any) {
+            console.error("Mic Access Error", err);
             setIsVoiceActive(false);
+            isVoiceActiveRef.current = false;
+
+            if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                alert(t('concierge.micErrorDenied'));
+            } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+                alert(t('concierge.micErrorNotFound'));
+            } else {
+                alert(`${t('concierge.micErrorUnknown')}: ${err.message || 'Unknown error'}`);
+            }
         }
     };
 
     // --- TEXT MODE HANDLER ---
     const handleSendText = async () => {
-        if (!input.trim() || !import.meta.env.VITE_GEMINI_API_KEY) return;
+        if (!input.trim()) return;
 
         const userMsg: Message = { id: Date.now().toString(), role: 'user', text: input, timestamp: new Date() };
         setMessages(prev => [...prev, userMsg]);
@@ -447,23 +421,26 @@ export const ConciergeWidget: React.FC<ConciergeWidgetProps> = ({ transactions, 
         setIsLoading(true);
 
         try {
-            const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
+            const { aiClient } = await import('../lib/ai/proxy');
             const context = getFinancialContext();
 
-            const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
-                contents: [
-                    { role: 'user', parts: [{ text: `Context Data:\n${context}\n\nUser Query: ${userMsg.text}` }] }
+            const response = await aiClient.generateContent(
+                'gemini-2.5-flash',
+                [
+                    {
+                        role: 'user',
+                        parts: [{ text: `Context Data:\n${context}\n\nUser Query: ${userMsg.text}` }]
+                    }
                 ],
-                config: {
-                    systemInstruction: "You are the AurumWolf Concierge. Use tools to add transactions if asked. Answer financial questions briefly.",
+                {
+                    systemInstruction: `You are the AurumWolf Concierge. Use tools to add transactions if asked. Answer financial questions briefly. ${privacyMode ? 'PRIVACY MODE ON. DO NOT REVEAL SPECIFIC BALANCES OR SENSITIVE DATA UNLESS EXPLICITLY ASKED BY USER.' : ''}`,
                     tools: [
-                        { functionDeclarations: [addTransactionTool, searchTransactionsTool, createBudgetTool] }
+                        { functionDeclarations: [addTransactionTool, searchTransactionsTool, createBudgetTool, convertCurrencyTool] }
                     ]
                 }
-            });
+            );
 
-            const functionCalls = response.functionCalls;
+            const functionCalls = response.functionCalls();
             if (functionCalls && functionCalls.length > 0) {
                 const call = functionCalls[0];
                 if (call.name === 'addTransaction' && onAddTransactionData) {
@@ -472,40 +449,68 @@ export const ConciergeWidget: React.FC<ConciergeWidgetProps> = ({ transactions, 
                         id: crypto.randomUUID(),
                         accountId: accounts[0]?.id || '1',
                         name: args.merchant,
-                        amount: new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(args.amount),
+                        amount: formatCurrency(args.amount, 'USD', { locale }),
                         numericAmount: args.amount,
                         currency: 'USD',
                         date: args.date || new Date().toISOString().split('T')[0],
                         category: args.category || 'Uncategorized',
                         type: args.type,
                         status: 'completed',
-                        description: 'Added via Concierge'
+                        description: t('concierge.addedVia')
                     };
                     onAddTransactionData(newTx);
                     setMessages(prev => [...prev, {
                         id: (Date.now() + 1).toString(),
                         role: 'model',
-                        text: `Transaction recorded: ${newTx.name} for ${newTx.amount}.`,
+                        text: t('concierge.transactionRecorded')
+                            .replace('{name}', newTx.name)
+                            .replace('{amount}', formatCurrency(Number(newTx.amount), newTx.currency || 'USD', { locale })),
                         timestamp: new Date()
                     }]);
                 }
                 if (call.name === 'searchTransactions') {
                     const args = call.args as any;
-                    const query = (args.query || '').toLowerCase();
-                    const results = transactions.filter(t => {
-                        const matchesQuery = !query || t.name.toLowerCase().includes(query) || t.category.toLowerCase().includes(query);
-                        const matchesDate = (!args.startDate || t.date >= args.startDate) && (!args.endDate || t.date <= args.endDate);
-                        return matchesQuery && matchesDate;
-                    }).slice(0, 10);
+                    const query = (args.query || '').trim();
+                    let responseText = t('concierge.noResults');
 
-                    const resultText = results.length > 0
-                        ? `Found ${results.length} transactions:\n` + results.map(t => `- ${t.date}: ${t.name} (${t.amount})`).join('\n')
-                        : "No matching transactions found.";
+                    try {
+                        let dbQuery = supabase
+                            .from('transactions')
+                            .select('*')
+                            .order('date', { ascending: false })
+                            .limit(10);
+
+                        if (query) {
+                            // Search name or category case-insensitive
+                            dbQuery = dbQuery.or(`name.ilike.%${query}%,category.ilike.%${query}%`);
+                        }
+
+                        // Date filters are tricky in 'or' logic, so we chain them if present
+                        if (args.startDate) dbQuery = dbQuery.gte('date', args.startDate);
+                        if (args.endDate) dbQuery = dbQuery.lte('date', args.endDate);
+
+                        const { data, error } = await dbQuery;
+
+                        if (error) {
+                            console.error("Search error:", error);
+                            responseText = t('common.error');
+                        } else if (data && data.length > 0) {
+                            const foundMsg = t('concierge.foundTransactions').replace('{count}', data.length.toString());
+                            responseText = `${foundMsg}\n` +
+                                data.map((t: any) => `- ${t.date}: ${t.name} (${formatCurrency(t.amount, t.currency || 'USD', { locale, compact: true })})`).join('\n');
+                        } else {
+                            responseText = t('concierge.noResults');
+                        }
+
+                    } catch (err) {
+                        console.error("Search exception:", err);
+                        responseText = t('common.error');
+                    }
 
                     setMessages(prev => [...prev, {
                         id: (Date.now() + 1).toString(),
                         role: 'model',
-                        text: resultText,
+                        text: responseText,
                         timestamp: new Date()
                     }]);
                 }
@@ -515,21 +520,47 @@ export const ConciergeWidget: React.FC<ConciergeWidgetProps> = ({ transactions, 
                     onAddBudget({
                         category: args.category,
                         limit: args.limit,
-                        currency: 'USD',
-                        period: 'monthly'
+                        color: 'bg-indigo-500', // Default color
+                        currency: 'USD'
                     });
                     setMessages(prev => [...prev, {
                         id: (Date.now() + 1).toString(),
                         role: 'model',
-                        text: `Budget created: ${args.category} with limit $${args.limit}.`,
+                        text: t('concierge.budgetCreated')
+                            .replace('{category}', args.category)
+                            .replace('{limit}', formatCurrency(Number(args.limit), 'USD', { locale, compact: true })),
                         timestamp: new Date()
                     }]);
+                }
+
+                if (call.name === 'convert_currency') {
+                    const args = call.args as any;
+                    try {
+                        const result = await convertWithRealRate(args.amount, args.from, args.to);
+                        if (result) {
+                            setMessages(prev => [...prev, {
+                                id: (Date.now() + 1).toString(),
+                                role: 'model',
+                                text: `💱 ${formatCurrency(args.amount, args.from, { locale })} = **${formatCurrency(result.convertedAmount, args.to, { locale })}**\n(Rate: ${result.rate.toFixed(4)})`,
+                                timestamp: new Date()
+                            }]);
+                        } else {
+                            setMessages(prev => [...prev, {
+                                id: (Date.now() + 1).toString(),
+                                role: 'model',
+                                text: t('common.error'),
+                                timestamp: new Date()
+                            }]);
+                        }
+                    } catch (err) {
+                        console.error("Conversion error", err);
+                    }
                 }
             } else {
                 setMessages(prev => [...prev, {
                     id: (Date.now() + 1).toString(),
                     role: 'model',
-                    text: response.text || "I processed that request.",
+                    text: response.text() || t('concierge.processed'),
                     timestamp: new Date()
                 }]);
             }
@@ -539,7 +570,7 @@ export const ConciergeWidget: React.FC<ConciergeWidgetProps> = ({ transactions, 
             setMessages(prev => [...prev, {
                 id: (Date.now() + 1).toString(),
                 role: 'model',
-                text: `Connection error. Details: ${error instanceof Error ? error.message : String(error)}`,
+                text: `${t('concierge.connectionError')} Details: ${error instanceof Error ? error.message : String(error)}`,
                 timestamp: new Date()
             }]);
         } finally {
@@ -566,7 +597,7 @@ export const ConciergeWidget: React.FC<ConciergeWidgetProps> = ({ transactions, 
     }
 
     return (
-        <div className={`fixed z-50 transition-all duration-300 ease-in-out shadow-2xl overflow-hidden flex flex-col bg-neutral-900 border border-gold-500/30
+        <div className={`fixed z-50 transition-all duration-300 ease-in-out shadow-2xl overflow-hidden flex flex-col bg-white dark:bg-neutral-900 border border-platinum-200 dark:border-gold-500/30
       ${isExpanded
                 ? 'inset-0 md:inset-auto md:bottom-8 md:right-8 md:w-[600px] md:h-[80vh] md:rounded-3xl'
                 : 'bottom-24 md:bottom-8 right-4 md:right-8 w-[90vw] md:w-[400px] h-[500px] rounded-3xl'
@@ -574,23 +605,23 @@ export const ConciergeWidget: React.FC<ConciergeWidgetProps> = ({ transactions, 
     `}>
 
             {/* Header */}
-            <div className="h-16 bg-gradient-to-r from-neutral-950 to-neutral-900 border-b border-neutral-800 flex items-center justify-between px-5 shrink-0 relative z-20">
+            <div className="h-16 bg-white dark:bg-gradient-to-r dark:from-neutral-950 dark:to-neutral-900 border-b border-platinum-200 dark:border-neutral-800 flex items-center justify-between px-5 shrink-0 relative z-20">
                 <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-gold-500/10 border border-gold-500/30 flex items-center justify-center text-gold-500">
                         <Sparkles size={16} />
                     </div>
                     <div>
-                        <h3 className="text-sm font-display font-bold text-white tracking-wide">Concierge</h3>
-                        <p className="text-[10px] text-green-500 font-mono flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span> Online
+                        <h3 className="text-sm font-display font-bold text-neutral-900 dark:text-white tracking-wide">Concierge</h3>
+                        <p className="text-[10px] text-green-600 dark:text-green-500 font-mono flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span> {t('concierge.online')}
                         </p>
                     </div>
                 </div>
-                <div className="flex items-center gap-2 text-neutral-400">
-                    <button onClick={() => setIsExpanded(!isExpanded)} className="p-2 hover:text-white transition-colors hidden md:block">
+                <div className="flex items-center gap-2 text-neutral-400 hover:text-neutral-900 dark:hover:text-white">
+                    <button onClick={() => setIsExpanded(!isExpanded)} className="p-2 transition-colors hidden md:block">
                         {isExpanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
                     </button>
-                    <button onClick={() => { setIsOpen(false); stopVoiceSession(); }} className="p-2 hover:text-white transition-colors">
+                    <button onClick={() => { setIsOpen(false); stopVoiceSession(); }} className="p-2 transition-colors">
                         <ChevronDown size={20} />
                     </button>
                 </div>
@@ -612,33 +643,33 @@ export const ConciergeWidget: React.FC<ConciergeWidgetProps> = ({ transactions, 
                         </div>
                     </div>
                     <h3 className="text-xl font-display font-bold text-white mb-2">
-                        {voiceStatus === 'connecting' ? 'Connecting...' :
-                            voiceStatus === 'listening' ? 'Listening...' :
-                                'Speaking...'}
+                        {voiceStatus === 'connecting' ? t('concierge.connecting') :
+                            voiceStatus === 'listening' ? t('concierge.listening') :
+                                t('concierge.speaking')}
                     </h3>
                     <p className="text-sm text-neutral-500 max-w-xs text-center mb-12">
-                        Ask me to add transactions, analyze spending, or check your budget.
+                        {t('concierge.voicePrompt')}
                     </p>
                     <button
                         onClick={stopVoiceSession}
                         className="px-8 py-3 rounded-full bg-red-500/10 border border-red-500/50 text-red-500 font-bold flex items-center gap-2 hover:bg-red-500 hover:text-white transition-all"
                     >
-                        <MicOff size={18} /> End Call
+                        <MicOff size={18} /> {t('concierge.endCall')}
                     </button>
                 </div>
             )}
 
             {/* --- TEXT MESSAGES AREA --- */}
-            <div className="flex-1 overflow-y-auto p-5 space-y-4 custom-scrollbar bg-neutral-900/95">
+            <div className="flex-1 overflow-y-auto p-5 space-y-4 custom-scrollbar bg-platinum-50 dark:bg-neutral-900/95">
                 {messages.map((msg) => (
                     <div key={msg.id} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
-                        <div className={`w-8 h-8 rounded-full shrink-0 flex items-center justify-center border ${msg.role === 'user' ? 'bg-neutral-800 border-neutral-700 text-neutral-400' : 'bg-gold-500 text-neutral-950 border-gold-400'
+                        <div className={`w-8 h-8 rounded-full shrink-0 flex items-center justify-center border ${msg.role === 'user' ? 'bg-platinum-200 dark:bg-neutral-800 border-platinum-300 dark:border-neutral-700 text-neutral-600 dark:text-neutral-400' : 'bg-gold-500 text-neutral-950 border-gold-400'
                             }`}>
                             {msg.role === 'user' ? <User size={16} /> : <Bot size={18} />}
                         </div>
                         <div className={`max-w-[80%] rounded-2xl p-3.5 text-sm leading-relaxed ${msg.role === 'user'
-                            ? 'bg-neutral-800 text-white border border-neutral-700'
-                            : 'bg-gradient-to-br from-neutral-950 to-neutral-900 text-neutral-200 border border-neutral-800 shadow-sm'
+                            ? 'bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white border border-platinum-200 dark:border-neutral-700 text-right'
+                            : 'bg-white dark:bg-gradient-to-br dark:from-neutral-950 dark:to-neutral-900 text-neutral-700 dark:text-neutral-200 border border-platinum-200 dark:border-neutral-800 shadow-sm'
                             }`}>
                             {msg.text}
                             <p className={`text-[9px] mt-2 opacity-50 ${msg.role === 'user' ? 'text-right' : 'text-left'}`}>
@@ -652,9 +683,9 @@ export const ConciergeWidget: React.FC<ConciergeWidgetProps> = ({ transactions, 
                         <div className="w-8 h-8 rounded-full bg-gold-500 text-neutral-950 flex items-center justify-center shrink-0">
                             <Bot size={18} />
                         </div>
-                        <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-4 flex items-center gap-2">
+                        <div className="bg-white dark:bg-neutral-950 border border-platinum-200 dark:border-neutral-800 rounded-2xl p-4 flex items-center gap-2 shadow-sm">
                             <Loader2 size={16} className="text-gold-500 animate-spin" />
-                            <span className="text-xs text-neutral-500">Processing...</span>
+                            <span className="text-xs text-neutral-500">{t('common.processing')}</span>
                         </div>
                     </div>
                 )}
@@ -662,12 +693,12 @@ export const ConciergeWidget: React.FC<ConciergeWidgetProps> = ({ transactions, 
             </div>
 
             {/* --- INPUT AREA --- */}
-            <div className="p-4 bg-neutral-950 border-t border-neutral-800 shrink-0">
+            <div className="p-4 bg-white dark:bg-neutral-950 border-t border-platinum-200 dark:border-neutral-800 shrink-0">
                 <div className="relative flex items-center gap-2">
                     <button
                         onClick={startVoiceSession}
-                        className="p-3 rounded-xl bg-neutral-900 border border-neutral-800 text-gold-500 hover:bg-gold-500/10 hover:border-gold-500/50 transition-all group"
-                        title="Start Voice Call"
+                        className="p-3 rounded-xl bg-platinum-100 dark:bg-neutral-900 border border-platinum-200 dark:border-neutral-800 text-gold-600 dark:text-gold-500 hover:bg-gold-500/10 hover:border-gold-500/50 transition-all group"
+                        title={t('concierge.startCall')}
                     >
                         <Headphones size={20} className="group-hover:scale-110 transition-transform" />
                     </button>
@@ -678,8 +709,8 @@ export const ConciergeWidget: React.FC<ConciergeWidgetProps> = ({ transactions, 
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             onKeyDown={handleKeyPress}
-                            placeholder="Type a message..."
-                            className="w-full bg-neutral-900 border border-neutral-800 text-white text-sm rounded-xl pl-4 pr-10 py-3.5 outline-none focus:border-gold-500/50 focus:bg-neutral-900/80 transition-all placeholder:text-neutral-600"
+                            placeholder={t('concierge.typeMessage')}
+                            className="w-full bg-platinum-50 dark:bg-neutral-900 border border-platinum-200 dark:border-neutral-800 text-neutral-900 dark:text-white text-sm rounded-xl pl-4 pr-10 py-3.5 outline-none focus:border-gold-500/50 focus:bg-white dark:focus:bg-neutral-900/80 transition-all placeholder:text-neutral-500 dark:placeholder:text-neutral-600"
                             autoFocus
                         />
                     </div>

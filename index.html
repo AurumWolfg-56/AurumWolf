@@ -1,165 +1,128 @@
-
 <!DOCTYPE html>
 <html lang="en" class="dark">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <title>AurumWolf - Wealth Defined</title>
-    
-    <!-- PWA Configuration -->
-    <link rel="manifest" href="/manifest.json" />
-    <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)" />
-    <meta name="theme-color" content="#F1F3F5" media="(prefers-color-scheme: light)" />
-    
-    <!-- iOS Specific -->
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="AurumWolf" />
-    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/536/536093.png" />
 
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Manrope:wght@200;300;400;500;600;700;800&display=swap" rel="stylesheet">
-    
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      tailwind.config = {
-        darkMode: 'class',
-        theme: {
-          extend: {
-            colors: {
-              neutral: {
-                850: '#1f1f1f',
-                900: '#171717',
-                925: '#121212',
-                950: '#0a0a0a', // True dark
-              },
-              gold: {
-                400: '#FCD34D',
-                500: '#D4AF37', // Metallic Gold
-                600: '#B4941F',
-                glow: 'rgba(212, 175, 55, 0.5)'
-              },
-              platinum: {
-                50: '#F8F9FA',  // Ultra Light Silver
-                100: '#F1F3F5', // Base Silver
-                200: '#E9ECEF', // Structural Silver
-                300: '#DEE2E6', // Border Silver
-                400: '#CED4DA', // Deep Silver
-                500: '#ADB5BD', // Text Silver
-                900: '#212529', // Text Contrast
-              }
-            },
-            fontFamily: {
-              sans: ['Manrope', 'sans-serif'],
-              display: ['Cinzel', 'serif'],
-            },
-            animation: {
-              'fade-in': 'fadeIn 0.5s ease-out',
-              'fade-in-right': 'fadeInRight 0.3s ease-out',
-              'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-            },
-            keyframes: {
-              fadeIn: {
-                '0%': { opacity: '0' },
-                '100%': { opacity: '1' },
-              },
-              fadeInRight: {
-                '0%': { opacity: '0', transform: 'translateX(20px)' },
-                '100%': { opacity: '1', transform: 'translateX(0)' },
-              }
-            },
-            boxShadow: {
-              'neon-silver': '0 0 15px rgba(200, 200, 200, 0.4), 0 0 5px rgba(255, 255, 255, 0.8)',
-              'neon-gold': '0 0 15px rgba(212, 175, 55, 0.3)',
-            },
-            padding: {
-              'safe': 'env(safe-area-inset-bottom)',
-            }
-          }
-        }
-      }
-    </script>
-    <style>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="description"
+    content="AurumWolf - Intelligent Family Office & Wealth Management Dashboard. Track assets, analyze portfolio health, and optimize financial growth with AI." />
+  <title>AurumWolf | Intelligent Wealth</title>
+
+  <!-- PWA Configuration -->
+  <link rel="icon" type="image/png" href="/favicon.png?v=4" />
+  <link rel="alternate icon" href="/favicon.png?v=4" />
+  <link rel="apple-touch-icon" href="/icon-512.png?v=4" />
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#F1F3F5" media="(prefers-color-scheme: light)" />
+
+  <!-- iOS Specific -->
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="AurumWolf" />
+  <link rel="apple-touch-icon" href="/icon-512.png" />
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Manrope:wght@200;300;400;500;600;700;800&display=swap"
+    rel="stylesheet">
+
+  <!-- Tailwind CSS -->
+
+  <style>
+    body {
+      /* Default to Dark Mode base */
+      background-color: #0a0a0a;
+      color: #e5e5e5;
+      transition: background-color 0.3s ease, color 0.3s ease;
+      overscroll-behavior-y: none;
+      /* Prevent rubber-banding on iOS PWA */
+    }
+
+    /* Neon Silver Theme (Light Mode) */
+    html:not(.dark) body {
+      background-color: #F1F3F5;
+      /* platinum-100 */
+      color: #212529;
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #262626;
+      border-radius: 3px;
+    }
+
+    html:not(.dark) ::-webkit-scrollbar-thumb {
+      background: #CED4DA;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #D4AF37;
+    }
+
+    /* Utilities */
+    .pb-safe {
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    /* Print Styles */
+    @media print {
       body {
-        /* Default to Dark Mode base */
-        background-color: #0a0a0a;
-        color: #e5e5e5;
-        transition: background-color 0.3s ease, color 0.3s ease;
-        overscroll-behavior-y: none; /* Prevent rubber-banding on iOS PWA */
-      }
-      
-      /* Neon Silver Theme (Light Mode) */
-      html:not(.dark) body {
-        background-color: #F1F3F5; /* platinum-100 */
-        color: #212529;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
       }
 
-      /* Custom Scrollbar */
-      ::-webkit-scrollbar {
-        width: 6px;
-      }
-      ::-webkit-scrollbar-track {
-        background: transparent;
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #262626;
-        border-radius: 3px;
-      }
-      html:not(.dark) ::-webkit-scrollbar-thumb {
-        background: #CED4DA;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #D4AF37;
-      }
-      
-      /* Utilities */
-      .pb-safe {
-        padding-bottom: env(safe-area-inset-bottom);
+      body * {
+        visibility: hidden;
       }
 
-      /* Print Styles */
-      @media print {
-        body {
-          -webkit-print-color-adjust: exact !important;
-          print-color-adjust: exact !important;
-        }
-        body * {
-          visibility: hidden;
-        }
-        /* Only show specific print containers */
-        .fixed.inset-0.z-\[200\] * {
-          visibility: visible;
-        }
-        /* Adjust positioning for print */
-        .fixed.inset-0.z-\[200\] {
-          position: absolute;
-          left: 0;
-          top: 0;
-          width: 100%;
-          height: 100%;
-          background: white;
-          padding: 0;
-          overflow: visible;
-        }
-        /* Hide buttons inside the print preview */
-        button, .print\:hidden, .no-print {
-          display: none !important;
-        }
-        /* Pagination control */
-        .page-break {
-          page-break-before: always;
-          break-before: page;
-        }
-        .avoid-break {
-          page-break-inside: avoid;
-          break-inside: avoid;
-        }
+      /* Only show specific print containers */
+      .fixed.inset-0.z-\[200\] * {
+        visibility: visible;
       }
-    </style>
+
+      /* Adjust positioning for print */
+      .fixed.inset-0.z-\[200\] {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background: white;
+        padding: 0;
+        overflow: visible;
+      }
+
+      /* Hide buttons inside the print preview */
+      button,
+      .print\:hidden,
+      .no-print {
+        display: none !important;
+      }
+
+      /* Pagination control */
+      .page-break {
+        page-break-before: always;
+        break-before: page;
+      }
+
+      .avoid-break {
+        page-break-inside: avoid;
+        break-inside: avoid;
+      }
+    }
+  </style>
   <script type="importmap">
 {
   "imports": {
@@ -171,10 +134,12 @@
   }
 }
 </script>
-<link rel="stylesheet" href="/index.css">
+  <link rel="stylesheet" href="/index.css">
 </head>
-  <body>
-    <div id="root"></div>
+
+<body>
+  <div id="root"></div>
   <script type="module" src="/index.tsx"></script>
 </body>
+
 </html>

@@ -221,7 +221,7 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({
         <div className="animate-fade-in space-y-6 pb-24 md:pb-0 relative">
 
             {/* --- DESKTOP HEADER & CONTROLS --- */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-neutral-900 p-2 rounded-2xl border border-platinum-200 dark:border-neutral-800 shadow-sm dark:shadow-none sticky top-20 md:top-0 z-20">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 glass-card p-2 rounded-2xl shadow-sm dark:shadow-none sticky top-20 md:top-0 z-20">
 
                 {/* Quick Type Toggles */}
                 <div className="flex p-1 bg-platinum-100 dark:bg-neutral-950 rounded-xl overflow-x-auto custom-scrollbar">
@@ -324,7 +324,7 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({
             {txType === 'recurring' && viewMode === 'list' ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {filteredData.map(tx => (
-                        <div key={tx.id} className="bg-white dark:bg-neutral-900 border border-platinum-200 dark:border-neutral-800 rounded-2xl p-5 relative group hover:border-gold-500/30 transition-all shadow-sm">
+                        <div key={tx.id} className="glass-card rounded-2xl p-5 relative group hover:border-gold-500/30 transition-all shadow-sm">
                             <div className="flex justify-between items-start mb-4">
                                 <div className="flex items-center gap-3">
                                     <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center border border-blue-500/20">
@@ -382,20 +382,22 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({
                             <div className="space-y-2">
                                 {(items as Transaction[]).map(tx => {
                                     const isForeign = tx.accountCurrency && tx.currency !== tx.accountCurrency;
+                                    const isAdjustment = tx.category === 'Adjustment' || tx.category === 'Starting Balance' || tx.name.includes('accounts.balanceAdjustment');
                                     const businessName = getBusinessName(tx.business_id);
 
                                     return (
                                         <div
                                             key={tx.id}
                                             onClick={() => onEditTransaction?.(tx)}
-                                            className="bg-white dark:bg-neutral-900 border border-platinum-200 dark:border-neutral-800 p-4 rounded-2xl flex items-center justify-between hover:border-gold-500/30 cursor-pointer transition-all shadow-sm group"
+                                            className="glass-card p-4 rounded-2xl flex items-center justify-between hover:border-gold-500/30 cursor-pointer transition-all shadow-sm group"
                                         >
                                             <div className="flex items-center gap-4">
-                                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center border transition-all relative ${tx.type === 'debit'
-                                                    ? 'bg-platinum-50 dark:bg-neutral-950 border-platinum-200 dark:border-neutral-800 text-neutral-400'
-                                                    : 'bg-green-500/10 border-green-500/20 text-green-500'
+                                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center border transition-all relative ${isAdjustment ? 'bg-neutral-100 dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700 text-neutral-500' :
+                                                    tx.type === 'debit'
+                                                        ? 'bg-platinum-50 dark:bg-neutral-950 border-platinum-200 dark:border-neutral-800 text-neutral-400'
+                                                        : 'bg-green-500/10 border-green-500/20 text-green-500'
                                                     }`}>
-                                                    {tx.type === 'debit' ? <ArrowUpRight size={18} /> : <ArrowDownRight size={18} />}
+                                                    {isAdjustment ? <SlidersHorizontal size={18} /> : tx.type === 'debit' ? <ArrowUpRight size={18} /> : <ArrowDownRight size={18} />}
 
                                                     {/* Recurring Badge */}
                                                     {tx.isRecurring && (
@@ -424,7 +426,8 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({
 
                                             <div className="flex items-center gap-3">
                                                 <div className="text-right">
-                                                    <p className={`text-base font-mono font-bold ${tx.type === 'credit' ? 'text-green-600 dark:text-green-400' : 'text-neutral-900 dark:text-white'
+                                                    <p className={`text-base font-mono font-bold ${isAdjustment ? 'text-neutral-500 dark:text-neutral-500' :
+                                                        tx.type === 'credit' ? 'text-green-600 dark:text-green-400' : 'text-neutral-900 dark:text-white'
                                                         }`}>
                                                         {tx.amount}
                                                     </p>

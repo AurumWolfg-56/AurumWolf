@@ -92,7 +92,7 @@ export const FinancialBreakdown: React.FC<FinancialBreakdownProps> = ({ transact
     let currentOffset = 0;
 
     return (
-        <div className="bg-white/60 dark:bg-neutral-900/60 backdrop-blur-xl border border-white/40 dark:border-white/5 rounded-[2.5rem] p-8 shadow-xl flex flex-col h-full group transition-colors hover:border-gold-500/20 duration-500">
+        <div className="glass rounded-[2.5rem] p-8 shadow-xl flex flex-col h-full group transition-colors hover:border-gold-500/20 duration-500">
             <div className="flex items-center justify-between mb-8">
                 <h3 className="text-sm font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-2">
                     <PieChart size={16} className="text-gold-500" /> Breakdown

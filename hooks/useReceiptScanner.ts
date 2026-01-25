@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { GoogleGenAI, Type } from "@google/genai";
+import { Type } from "@google/genai";
 import { CURRENCIES, CATEGORIES } from '../constants';
 
 export interface ScannedReceiptData {
@@ -22,78 +22,112 @@ export const useReceiptScanner = ({ apiKey, onScanComplete }: UseReceiptScannerP
     const [error, setError] = useState<string | null>(null);
 
     const scanReceipt = async (file: File) => {
-        if (!apiKey) {
-            const msg = "API Key missing.";
-            setError(msg);
-            alert(msg);
-            return;
-        }
-
         setIsScanning(true);
         setError(null);
 
         try {
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = async () => {
-                const result = reader.result as string;
-                const base64Data = result.includes(',') ? result.split(',')[1] : result;
-                const ai = new GoogleGenAI({ apiKey });
+            // 1. Resize Image to avoid Payload Limits (Max 1024px)
+            const resizedBase64 = await resizeImage(file, 1024);
 
-                const response = await ai.models.generateContent({
-                    model: 'gemini-2.0-flash', // Upgraded to latest fast model
-                    contents: {
+            // 2. Use Proxy Client
+            const { aiClient } = await import('../lib/ai/proxy');
+
+            // 3. Call AI
+            const response = await aiClient.generateContent(
+                'gemini-2.0-flash-exp',
+                [
+                    {
+                        role: 'user',
                         parts: [
-                            { inlineData: { mimeType: file.type, data: base64Data } },
+                            { inlineData: { mimeType: 'image/jpeg', data: resizedBase64 } },
                             {
-                                text: `Analyze this receipt/invoice image. Extract the following fields strictly as JSON:
-                                - amount (number, e.g. 12.50)
-                                - currency (ISO code, e.g. USD, EUR, MXN)
-                                - merchant (string, store name)
-                                - date (YYYY-MM-DD format)
-                                - category (Best match from this list: ${CATEGORIES.map(c => c.name).join(', ')})
-                                - description (short summary of items purchased)`
+                                text: `Analyze this receipt image. Extract data into this exact JSON structure:
+                                {
+                                  "amount": number (no currency symbols),
+                                  "currency": "ISO_CODE" (e.g. USD, MXN),
+                                  "merchant": "Merchant Name",
+                                  "date": "YYYY-MM-DD",
+                                  "category": "Best Match",
+                                  "description": "Short summary of items"
+                                }
+                                Use these categories: ${CATEGORIES.map(c => c.category).join(', ')}.
+                                If a field is missing, omit it or use null.`
                             }
                         ]
-                    },
-                    config: {
-                        responseMimeType: "application/json",
-                        responseSchema: {
-                            type: Type.OBJECT,
-                            properties: {
-                                amount: { type: Type.NUMBER },
-                                currency: { type: Type.STRING },
-                                merchant: { type: Type.STRING },
-                                date: { type: Type.STRING },
-                                category: { type: Type.STRING },
-                                description: { type: Type.STRING },
-                            }
-                        }
                     }
-                });
-
-                if (response.text) {
-                    const data = JSON.parse(response.text) as ScannedReceiptData;
-                    // Normalize currency if possible
-                    if (data.currency) {
-                        const supported = CURRENCIES.find(c => c.code === data.currency);
-                        if (supported) data.currency = supported.code;
-                    }
-                    onScanComplete?.(data);
-                } else {
-                    throw new Error("No text returned from AI");
+                ],
+                {
+                    responseMimeType: "application/json"
                 }
-                setIsScanning(false);
-            };
-            reader.onerror = () => {
-                throw new Error("Failed to read file");
+            );
+
+            const text = response.text();
+            if (text) {
+                // Sanitize Markdown
+                const cleanText = text.replace(/```json\n?|\n?```/g, '').trim();
+                const data = JSON.parse(cleanText) as ScannedReceiptData;
+
+                if (data.currency) {
+                    const supported = CURRENCIES.find(c => c.code === data.currency);
+                    if (supported) data.currency = supported.code;
+                }
+                onScanComplete?.(data);
+            } else {
+                throw new Error("No text returned from AI");
             }
+
         } catch (err: any) {
             console.error("Scanning failed", err);
-            setError(err.message || "Scanning failed");
+            const msg = err.message || "Scanning failed";
+            setError(msg);
+
+            // Handle Rate Limiting specifically
+            if (msg.includes("429") || msg.includes("Quota") || msg.includes("limit")) {
+                alert("⏳ AI Traffic High (Rate Limit)\n\nGoogle's free AI service is busy. Please wait 30-60 seconds and try again.");
+            } else {
+                alert("Error processing receipt: " + msg);
+            }
+        } finally {
             setIsScanning(false);
-            alert("Scanning failed. Please try again.");
         }
+    };
+
+    // Helper: Resize Image
+    const resizeImage = (file: File, maxDim: number): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > height) {
+                        if (width > maxDim) {
+                            height *= maxDim / width;
+                            width = maxDim;
+                        }
+                    } else {
+                        if (height > maxDim) {
+                            width *= maxDim / height;
+                            height = maxDim;
+                        }
+                    }
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx?.drawImage(img, 0, 0, width, height);
+                    // Return raw base64 string (no data:image/jpeg;base64, prefix) for Gemini
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                    resolve(dataUrl.split(',')[1]);
+                };
+                img.onerror = reject;
+                img.src = e.target?.result as string;
+            };
+            reader.onerror = reject;
+        });
     };
 
     return {

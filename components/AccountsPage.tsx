@@ -191,8 +191,8 @@ export const CardVisual: React.FC<CardVisualProps> = ({ account, showBalances, o
 interface AccountsPageProps {
     onEditTransaction?: (tx: Transaction) => void;
     onTransfer?: (sourceId: string, destId: string, amount: number, date: string) => void;
-    onAddAccount?: (account: Account) => void;
-    onUpdateAccount?: (account: Account) => void;
+    onAddAccount?: (account: Account) => Promise<void>;
+    onUpdateAccount?: (account: Account) => Promise<void>;
     onDeleteAccount?: (id: string) => void;
     onViewHistory?: (accountId: string) => void;
     searchQuery?: string;
@@ -214,7 +214,7 @@ export const AccountsPage: React.FC<AccountsPageProps> = ({
     t
 }) => {
     const { accounts } = useAccounts();
-    const { transactions } = useTransactions();
+    const { transactions, addTransaction, updateTransaction } = useTransactions();
     const { entities: businessEntities } = useBusiness();
 
 
@@ -279,28 +279,111 @@ export const AccountsPage: React.FC<AccountsPageProps> = ({
         setIsTransferOpen(true);
     }
 
-    const handleSaveAccount = (account: Account) => {
-        // Fix: Recalculate initialBalance so that the resulting reconciled balance matches the user's input.
-        // effectiveBalance = initialBalance + netChange
-        // Therefore: initialBalance = user_input_balance - netChange
+    const handleSaveAccount = async (account: Account) => {
+        // DOUBLE-ENTRY LOGIC:
+        // We do NOT rely on 'initialBalance' field since it's not persisted reliably in typical SQL schemas without specific columns.
+        // Instead, we ensure the Sum(Transactions) matches the desired Account Balance.
+
+        // 0. CHECK FOR BALANCE CHANGE (Prevent Phantom Transactions)
+        // Find the original state of this account to see if the user actually modified the balance.
+        const originalAccount = accounts.find(a => a.id === account.id);
+
+        // If it's a new account (no original) OR the balance is significantly different, proceed.
+        const hasBalanceChanged = !originalAccount || Math.abs(originalAccount.balance - account.balance) > 0.01;
+
+        if (!hasBalanceChanged) {
+            // User only edited metadata (Name, Last4, etc.). Do NOT touch transactions.
+            // Just save the metadata update.
+            if (isEditingAccount && onUpdateAccount) {
+                onUpdateAccount(account);
+                setSelectedAccount(account);
+            }
+            setIsFormOpen(false);
+            setIsEditingAccount(false);
+            return;
+        }
+
+        if (isEditingAccount && onUpdateAccount) {
+            await onUpdateAccount(account);
+            setSelectedAccount(account);
+        } else if (onAddAccount) {
+            await onAddAccount(account);
+        }
+
+        // 1. Calculate what the system CURRENTLY thinks the balance is (Sum of existing Txs)
+        // Note: For a NEW account, this is 0.
         const accountTxs = transactions.filter(t => t.accountId === account.id);
-        const netChange = accountTxs.reduce((acc, t) => {
+        const currentCalculatedBalance = accountTxs.reduce((acc, t) => {
             if (t.type === 'credit') return acc + t.numericAmount;
             if (t.type === 'debit') return acc - t.numericAmount;
             return acc;
         }, 0);
 
-        const adjustedAccount = {
-            ...account,
-            initialBalance: account.balance - netChange
-        };
+        // 2. Determine if we need an adjustment Transaction
+        // Target Balance = account.balance (User input from Form)
+        // Adjustment Needed = Target - CurrentCalculated
+        const adjustmentAmount = account.balance - currentCalculatedBalance;
 
-        if (isEditingAccount && onUpdateAccount) {
-            onUpdateAccount(adjustedAccount);
-            setSelectedAccount(adjustedAccount);
-        } else if (onAddAccount) {
-            onAddAccount(adjustedAccount);
+        // Only create/update transaction if difference is significant (floating point safety)
+        if (Math.abs(adjustmentAmount) > 0.01) {
+            // Smart Logic: Check if we have an existing "system" transaction we can just update
+            // effectively "correcting" the initial balance instead of spamming the ledger.
+            const existingSystemTx = accountTxs.find(tx =>
+                (tx.name === t('accounts.startingBalance') || tx.name === t('accounts.balanceAdjustment')) &&
+                tx.date === getLocalDateISO() // Only merge if it happened today (or make this broader if needed)
+            );
+
+            if (existingSystemTx && updateTransaction) {
+                // Update the existing transaction
+                const newAmount = existingSystemTx.numericAmount + (existingSystemTx.type === 'credit' ? adjustmentAmount : -adjustmentAmount);
+                // Wait, easier: Just Calculate what the "Starting Balance" SHOULD have been.
+                // Target = currentCalculated - existingSystemTx + NewSystemTx
+                // We simply add the adjustment to the existing transaction's numeric value.
+
+                // Let's keep it simple: just Add/Subtract the adjustment from the existing amount.
+                // If it was Credit 500, and adjustment is +100 (Target 600). New is Credit 600.
+
+                let newNumeric = 0;
+                let newType = existingSystemTx.type;
+
+                // Normalize: Helper to get signed value
+                const existingSigned = existingSystemTx.type === 'credit' ? existingSystemTx.numericAmount : -existingSystemTx.numericAmount;
+                const newSigned = existingSigned + adjustmentAmount;
+
+                if (newSigned >= 0) {
+                    newNumeric = newSigned;
+                    newType = 'credit';
+                } else {
+                    newNumeric = Math.abs(newSigned);
+                    newType = 'debit';
+                }
+
+                await updateTransaction({
+                    ...existingSystemTx,
+                    numericAmount: newNumeric,
+                    amount: formatCurrency(newNumeric, account.currency),
+                    type: newType
+                });
+
+            } else {
+                const isPositiveAdjustment = adjustmentAmount > 0;
+                const adjustmentTx: Transaction = {
+                    id: crypto.randomUUID(),
+                    accountId: account.id,
+                    name: isEditingAccount ? t('accounts.balanceAdjustment') : t('accounts.startingBalance'),
+                    amount: formatCurrency(Math.abs(adjustmentAmount), account.currency),
+                    numericAmount: Math.abs(adjustmentAmount),
+                    currency: account.currency,
+                    date: getLocalDateISO(),
+                    category: 'Adjustment', // Changed from Income/Adjustment logic to always be Adjustment for system ops
+                    type: isPositiveAdjustment ? 'credit' : 'debit',
+                    status: 'completed',
+                    description: isEditingAccount ? 'Manual balance correction' : 'Initial deposit'
+                };
+                await addTransaction(adjustmentTx);
+            }
         }
+
         setIsFormOpen(false);
         setIsEditingAccount(false);
     };
@@ -423,7 +506,7 @@ export const AccountsPage: React.FC<AccountsPageProps> = ({
                 </div>
 
                 {/* BALANCE HISTORY CHART */}
-                <div className="bg-white dark:bg-neutral-900 border border-platinum-200 dark:border-neutral-800 rounded-3xl p-6 shadow-sm">
+                <div className="glass-card rounded-3xl p-6 shadow-sm">
                     <div className="flex justify-between items-center mb-4">
                         <h3 className="text-xs font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-2">
                             <TrendingUp size={16} className="text-gold-500" /> {t('accounts.balanceHistory')}
@@ -439,7 +522,7 @@ export const AccountsPage: React.FC<AccountsPageProps> = ({
                 </div>
 
                 {/* Transaction History for this Account */}
-                <div className="bg-white dark:bg-neutral-900 border border-platinum-200 dark:border-neutral-800 rounded-3xl overflow-hidden mt-6 shadow-sm">
+                <div className="glass-card rounded-3xl overflow-hidden mt-6 shadow-sm">
                     <div className="p-6 border-b border-platinum-200 dark:border-neutral-800 flex justify-between items-center bg-platinum-50 dark:bg-neutral-950">
                         <h3 className="font-bold text-neutral-900 dark:text-white flex items-center gap-2">
                             <History size={16} className="text-gold-500" /> {t('accounts.ledger')}
@@ -512,7 +595,7 @@ export const AccountsPage: React.FC<AccountsPageProps> = ({
         <div className="animate-fade-in space-y-6 pb-20 md:pb-0">
 
             {/* Overview Header */}
-            <div className="bg-white dark:bg-neutral-900 border border-platinum-200 dark:border-neutral-800 rounded-3xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm dark:shadow-none">
+            <div className="glass-card rounded-3xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm dark:shadow-none">
                 <div>
                     <h2 className="text-sm font-bold text-neutral-500 uppercase tracking-wider mb-1 flex items-center gap-2">
                         <Globe size={16} className="text-gold-500" /> {t('accounts.globalNetLiquid')}

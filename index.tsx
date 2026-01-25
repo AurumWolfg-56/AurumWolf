@@ -1,34 +1,30 @@
-
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import './index.css';
+import { AuthProvider } from './contexts/AuthContext';
 import { AccountsProvider } from './contexts/AccountsContext';
 import { TransactionsProvider } from './contexts/TransactionsContext';
 import { BudgetsProvider } from './contexts/BudgetsContext';
 import { InvestmentsProvider } from './contexts/InvestmentsContext';
 import { BusinessProvider } from './contexts/BusinessContext';
-import { AuthProvider } from './contexts/AuthContext';
+import { CategoryProvider } from './contexts/CategoryContext';
 
-import './index.css';
-
-const rootElement = document.getElementById('root');
-if (!rootElement) {
-  throw new Error("Could not find root element to mount to");
-}
-
-const root = ReactDOM.createRoot(rootElement);
+const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
 root.render(
   <React.StrictMode>
     <AuthProvider>
       <AccountsProvider>
         <TransactionsProvider>
-          <BudgetsProvider>
+          <BusinessProvider>
             <InvestmentsProvider>
-              <BusinessProvider>
-                <App />
-              </BusinessProvider>
+              <CategoryProvider>
+                <BudgetsProvider>
+                  <App />
+                </BudgetsProvider>
+              </CategoryProvider>
             </InvestmentsProvider>
-          </BudgetsProvider>
+          </BusinessProvider>
         </TransactionsProvider>
       </AccountsProvider>
     </AuthProvider>

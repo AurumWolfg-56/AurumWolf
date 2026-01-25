@@ -6,8 +6,62 @@ import {
    Download, Trash2, Languages, Moon, Sun, FileSpreadsheet, Coins, Upload, HardDrive, RefreshCw
 } from 'lucide-react';
 import { Transaction, Account, Investment, Language } from '../types';
+import { useSecurity } from '../contexts/SecurityContext'; // New import
 import { CURRENCIES } from '../constants';
 import { getJSON, setJSON, STORAGE_KEYS } from '../lib/storage';
+import { z } from 'zod';
+
+// Minimal Zod Schemas for Validation
+const AccountSchema = z.object({
+   id: z.string(),
+   name: z.string(),
+   type: z.enum(['checking', 'savings', 'credit', 'investment', 'crypto', 'business']),
+   balance: z.number(),
+   currency: z.string(),
+   institution: z.string().optional(),
+   color: z.string().optional(),
+}).passthrough();
+
+const TransactionSplitSchema = z.object({
+   id: z.union([z.string(), z.number()]),
+   category: z.string(),
+   amount: z.number(),
+}).passthrough();
+
+const TransactionSchema = z.object({
+   id: z.string(),
+   accountId: z.string(),
+   name: z.string(),
+   amount: z.string(),
+   numericAmount: z.number(),
+   currency: z.string(),
+   date: z.string(),
+   category: z.string(),
+   type: z.enum(['credit', 'debit']),
+   status: z.enum(['pending', 'completed']),
+   splits: z.array(TransactionSplitSchema).optional(),
+}).passthrough();
+
+const BudgetCategorySchema = z.object({
+   id: z.string(),
+   category: z.string(),
+   limit: z.number(),
+}).passthrough();
+
+const SavingsGoalSchema = z.object({
+   id: z.string(),
+   name: z.string(),
+   targetAmount: z.number(),
+}).passthrough();
+
+const InvestmentSchema = z.object({
+   id: z.string(),
+   name: z.string(),
+   type: z.string(),
+   quantity: z.number(),
+   currentPrice: z.number(),
+   currentValue: z.number(),
+}).passthrough();
 
 interface SettingsPageProps {
    onReset?: () => void;
@@ -23,6 +77,8 @@ interface SettingsPageProps {
    userName?: string;
    userEmail?: string;
    t: (key: string) => string;
+   notificationsEnabled?: boolean;
+   onToggleNotifications?: () => void;
 }
 
 export const SettingsPage: React.FC<SettingsPageProps> = ({
@@ -38,8 +94,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
    onLanguageChange,
    userName = "Guest",
    userEmail,
-   t
+   t,
+   notificationsEnabled = true,
+   onToggleNotifications
 }) => {
+   const { hasPin, biometricsEnabled, toggleBiometrics, setupPin, removePin } = useSecurity(); // Hook usage
    const [isDarkMode, setIsDarkMode] = React.useState(true);
    const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -119,6 +178,17 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
       document.body.removeChild(link);
    };
 
+   const BackupSchema = z.object({
+      accounts: z.array(AccountSchema),
+      transactions: z.array(TransactionSchema),
+      budgets: z.array(BudgetCategorySchema).optional(),
+      goals: z.array(SavingsGoalSchema).optional(),
+      investments: z.array(InvestmentSchema).optional(),
+      baseCurrency: z.string().optional(),
+      // We allow other fields like version/timestamp to be loosely present or we can explicitly ignore them
+      // strip() is default in Zod object unless strict() is called, but let's be safe.
+   }).passthrough();
+
    const handleRestoreJSON = (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
@@ -126,24 +196,32 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
       const reader = new FileReader();
       reader.onload = (event) => {
          try {
-            const data = JSON.parse(event.target?.result as string);
-            if (data.accounts && data.transactions) {
-               if (window.confirm("Warning: Restoring will overwrite all current data (including investments). Continue?")) {
-                  setJSON(STORAGE_KEYS.ACCOUNTS, data.accounts);
-                  setJSON(STORAGE_KEYS.TRANSACTIONS, data.transactions);
-                  if (data.budgets) setJSON(STORAGE_KEYS.BUDGETS, data.budgets);
-                  if (data.goals) setJSON(STORAGE_KEYS.GOALS, data.goals);
-                  if (data.investments) setJSON(STORAGE_KEYS.INVESTMENTS, data.investments);
-                  if (data.baseCurrency) setJSON(STORAGE_KEYS.BASE_CURRENCY, data.baseCurrency);
+            const rawData = JSON.parse(event.target?.result as string);
 
-                  alert("Restore successful. Reloading...");
-                  window.location.reload();
-               }
-            } else {
-               alert("Invalid backup file format.");
+            // VALIDATION STEP
+            const result = BackupSchema.safeParse(rawData);
+
+            if (!result.success) {
+               console.error("Backup validation failed:", result.error);
+               alert(t('settings.alertInvalidBackup'));
+               return;
+            }
+
+            const data = result.data;
+
+            if (window.confirm(t('settings.alertRestoreWarning'))) {
+               setJSON(STORAGE_KEYS.ACCOUNTS, data.accounts);
+               setJSON(STORAGE_KEYS.TRANSACTIONS, data.transactions);
+               if (data.budgets) setJSON(STORAGE_KEYS.BUDGETS, data.budgets);
+               if (data.goals) setJSON(STORAGE_KEYS.GOALS, data.goals);
+               if (data.investments) setJSON(STORAGE_KEYS.INVESTMENTS, data.investments);
+               if (data.baseCurrency) setJSON(STORAGE_KEYS.BASE_CURRENCY, data.baseCurrency);
+
+               alert(t('settings.alertRestoreSuccess'));
+               window.location.reload();
             }
          } catch (err) {
-            alert("Error parsing backup file.");
+            alert(t('settings.alertParseError'));
             console.error(err);
          }
       };
@@ -153,9 +231,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
    };
 
    const handleReconcileClick = () => {
-      if (onReconcile && window.confirm("This will recalculate all account balances based on their initial snapshot and transaction history. This action cannot be undone. Proceed?")) {
+      if (onReconcile && window.confirm(t('settings.alertReconcileWarning'))) {
          onReconcile();
-         alert("Balances reconciled successfully.");
+         alert(t('settings.alertReconcileSuccess'));
       }
    };
 
@@ -289,7 +367,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                            <p className="text-xs text-neutral-500">{t('settings.notificationsDesc')}</p>
                         </div>
                      </div>
-                     <ToggleRight size={24} className="text-gold-500" />
+                     <button onClick={onToggleNotifications}>
+                        {notificationsEnabled ? (
+                           <ToggleRight size={32} className="text-gold-500" />
+                        ) : (
+                           <ToggleLeft size={32} className="text-neutral-400" />
+                        )}
+                     </button>
                   </div>
                </div>
             </div>
@@ -301,6 +385,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                   <h3 className="text-sm font-bold text-neutral-900 dark:text-white uppercase tracking-wider transition-colors">{t('settings.security')}</h3>
                </div>
                <div className="divide-y divide-neutral-200 dark:divide-neutral-800 transition-colors">
+
                   <div className="p-4 flex items-center justify-between hover:bg-neutral-50 dark:hover:bg-neutral-800/30 transition-colors">
                      <div className="flex items-center gap-3">
                         <div className="p-2 bg-neutral-100 dark:bg-neutral-950 rounded-lg text-neutral-400 transition-colors"><Fingerprint size={18} /></div>
@@ -309,18 +394,48 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                            <p className="text-xs text-neutral-500">{t('settings.biometricDesc')}</p>
                         </div>
                      </div>
-                     <ToggleRight size={24} className="text-gold-500" />
+                     <button onClick={() => toggleBiometrics(!biometricsEnabled)}>
+                        {biometricsEnabled ? (
+                           <ToggleRight size={32} className="text-gold-500" />
+                        ) : (
+                           <ToggleLeft size={32} className="text-neutral-400" />
+                        )}
+                     </button>
                   </div>
-                  <div className="p-4 flex items-center justify-between hover:bg-neutral-50 dark:hover:bg-neutral-800/30 transition-colors">
+                  <button
+                     onClick={() => {
+                        if (hasPin) {
+                           if (window.confirm("Disable Security PIN?")) {
+                              removePin();
+                           }
+                        } else {
+                           const newPin = window.prompt("Set 4-digit PIN");
+                           if (newPin?.length === 4 && !isNaN(Number(newPin))) {
+                              setupPin(newPin);
+                              alert("PIN Set Successfully");
+                           } else if (newPin) {
+                              alert("PIN must be 4 digits");
+                           }
+                        }
+                     }}
+                     className="w-full p-4 flex items-center justify-between hover:bg-neutral-50 dark:hover:bg-neutral-800/30 transition-colors text-left"
+                  >
                      <div className="flex items-center gap-3">
                         <div className="p-2 bg-neutral-100 dark:bg-neutral-950 rounded-lg text-neutral-400 transition-colors"><Lock size={18} /></div>
                         <div>
-                           <p className="text-sm font-bold text-neutral-900 dark:text-white transition-colors">{t('settings.changePin')}</p>
-                           <p className="text-xs text-neutral-500">{t('settings.changePinDesc')}</p>
+                           <p className="text-sm font-bold text-neutral-900 dark:text-white transition-colors">
+                              {hasPin ? "Remove PIN" : "Set Setup PIN"}
+                           </p>
+                           <p className="text-xs text-neutral-500">
+                              {hasPin ? "Tap to disable App Lock" : "Tap to enable App Lock"}
+                           </p>
                         </div>
                      </div>
-                     <ChevronRight size={16} className="text-neutral-500" />
-                  </div>
+                     <div className='flex items-center gap-2 text-gold-500'>
+                        {hasPin && <span className="text-xs font-mono bg-gold-500/10 px-2 py-1 rounded">ACTIVE</span>}
+                        <ChevronRight size={16} className="text-neutral-500" />
+                     </div>
+                  </button>
                </div>
             </div>
 
@@ -342,8 +457,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                            <RefreshCw size={18} />
                         </div>
                         <div>
-                           <p className="text-sm font-bold text-neutral-900 dark:text-white transition-colors group-hover:text-gold-500">Reconcile Balances</p>
-                           <p className="text-xs text-neutral-500">Recompute form transactions & initial snapshot</p>
+                           <p className="text-sm font-bold text-neutral-900 dark:text-white transition-colors group-hover:text-gold-500">{t('settings.termReconcile')}</p>
+                           <p className="text-xs text-neutral-500">{t('settings.termReconcileDesc')}</p>
                         </div>
                      </div>
                      <ChevronRight size={16} className="text-neutral-400" />
@@ -436,7 +551,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                AurumWolf v1.4.0 • Encrypted
             </p>
 
-         </div>
-      </div>
+         </div >
+      </div >
    );
 };

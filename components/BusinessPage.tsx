@@ -49,7 +49,7 @@ export const BusinessPage: React.FC<BusinessPageProps> = ({ searchQuery = '', ba
     const handleQuickAdd = async () => {
         if (!wizardName) return;
         const entity: BusinessEntity = {
-            id: '',
+            id: crypto.randomUUID(), // Generate valid ID for Optimistic UI & DB
             name: wizardName,
             type: wizardType as any,
         };
@@ -107,9 +107,9 @@ export const BusinessPage: React.FC<BusinessPageProps> = ({ searchQuery = '', ba
     // --- DETAIL VIEW RENDER ---
     if (selectedEntity) {
         // Filter transactions for this entity for the "Ledger"
-        const entityTxs = transactions.filter(t => t.business_id === selectedEntity.id);
-        const revenue = entityTxs.filter(t => t.type === 'credit').reduce((sum, t) => sum + t.numericAmount, 0);
-        const expenses = entityTxs.filter(t => t.type === 'debit').reduce((sum, t) => sum + t.numericAmount, 0);
+        const entityTxs = transactions.filter(tx => tx.business_id === selectedEntity.id);
+        const revenue = entityTxs.filter(tx => tx.type === 'credit').reduce((sum, tx) => sum + tx.numericAmount, 0);
+        const expenses = entityTxs.filter(tx => tx.type === 'debit').reduce((sum, tx) => sum + tx.numericAmount, 0);
         const profit = revenue - expenses;
 
         return (
@@ -272,9 +272,9 @@ export const BusinessPage: React.FC<BusinessPageProps> = ({ searchQuery = '', ba
             {/* Portfolio Financial Summary */}
             {entities.length > 0 && (() => {
                 // Calculate Portfolio Totals
-                const allBusinessTxs = transactions.filter(t => t.business_id);
-                const totalRev = allBusinessTxs.filter(t => t.type === 'credit').reduce((sum, t) => sum + t.numericAmount, 0);
-                const totalExp = allBusinessTxs.filter(t => t.type === 'debit').reduce((sum, t) => sum + t.numericAmount, 0);
+                const allBusinessTxs = transactions.filter(tx => tx.business_id);
+                const totalRev = allBusinessTxs.filter(tx => tx.type === 'credit').reduce((sum, tx) => sum + tx.numericAmount, 0);
+                const totalExp = allBusinessTxs.filter(tx => tx.type === 'debit').reduce((sum, tx) => sum + tx.numericAmount, 0);
                 const totalNet = totalRev - totalExp;
 
                 return (

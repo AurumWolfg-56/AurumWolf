@@ -85,7 +85,7 @@ export class ReportEngine {
             },
 
             trends: {
-                netWorth: [], // TODO: Implement backcasting logic if needed here, or keep simple
+                netWorth: this.generateNetWorthTrend(assetMetrics.netWorth, 6, spec.baseCurrency),
                 cashFlow: []
             },
 
@@ -206,7 +206,8 @@ export class ReportEngine {
         let businessRevenue = 0;
         let businessExpense = 0;
 
-        const catMap = new Map<string, number>();
+        const incomeCatMap = new Map<string, number>();
+        const expenseCatMap = new Map<string, number>();
 
         txs.forEach(t => {
             const amt = this.ctx.convertAmount(t.numericAmount, t.currency, currency);
@@ -217,10 +218,12 @@ export class ReportEngine {
                 else businessExpense += amt;
             } else {
                 // Personal Logic
-                if (t.type === 'credit') income += amt;
-                else {
+                if (t.type === 'credit') {
+                    income += amt;
+                    incomeCatMap.set(t.category, (incomeCatMap.get(t.category) || 0) + amt);
+                } else {
                     expense += amt;
-                    catMap.set(t.category, (catMap.get(t.category) || 0) + amt);
+                    expenseCatMap.set(t.category, (expenseCatMap.get(t.category) || 0) + amt);
                 }
             }
         });
@@ -243,12 +246,13 @@ export class ReportEngine {
                 }));
         };
 
-        const topExpenseCats = formatCat(Array.from(catMap.entries()), expense);
+        const topExpenseCats = formatCat(Array.from(expenseCatMap.entries()), expense);
+        const topIncomeCats = formatCat(Array.from(incomeCatMap.entries()), income);
 
         return {
             income, expense, net, savingsRate,
             businessRevenue, businessExpense, businessNet,
-            topIncomeCats: [], // TODO if needed
+            topIncomeCats,
             topExpenseCats
         };
     }
@@ -297,5 +301,81 @@ export class ReportEngine {
 
     private formatRaw(val: number, curr: string) {
         return new Intl.NumberFormat('en-US', { style: 'currency', currency: curr }).format(val);
+    }
+
+    // --- FORECASTING ENGINE ---
+
+    private generateNetWorthTrend(currentNetWorth: number, monthsBack: number, currency: string) {
+        // 1. Backcast History
+        const history: { date: string; value: number }[] = [];
+        let runningNetWorth = currentNetWorth;
+        const now = new Date();
+
+        // We go back 'monthsBack' months
+        for (let i = 0; i < monthsBack; i++) {
+            const endOfMonth = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth() - i, 1);
+
+            // Filter txs in this month
+            const txsInMonth = this.ctx.transactions.filter(t => {
+                const d = new Date(t.date);
+                return d >= startOfMonth && d <= endOfMonth;
+            });
+
+            // Calculate Net Change
+            // Income - Expense
+            let netChange = 0;
+            txsInMonth.forEach(t => {
+                const amt = this.ctx.convertAmount(t.numericAmount, t.currency, currency);
+                // If it's transfer, usually ignore? Assuming 'transfer' type exists or simple credit/debit 
+                // If scope is personal, we use standard logic
+                if (t.type === 'credit') netChange += amt;
+                else netChange -= amt;
+            });
+
+            // If we are at "Month i" end, the value is runningNetWorth.
+            // The value at "Month i" start (which is Month i+1 start roughly) 
+            // Valid point: End of Month Value
+            history.unshift({
+                date: endOfMonth.toISOString().split('T')[0],
+                value: runningNetWorth
+            });
+
+            // Prepare for previous month: subtract the change that happened this month
+            // NW_Start = NW_End - NetChange
+            runningNetWorth -= netChange;
+        }
+
+        // 2. Linear Regression (Least Squares)
+        // x = index (0 to history.length-1), y = value
+        const n = history.length;
+        if (n < 2) return history; // Not enough data
+
+        let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+        for (let i = 0; i < n; i++) {
+            sumX += i;
+            sumY += history[i].value;
+            sumXY += i * history[i].value;
+            sumXX += i * i;
+        }
+
+        const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+        const intercept = (sumY - slope * sumX) / n;
+
+        // 3. Project Future (6 Months)
+        const future: { date: string; value: number; isProjected?: boolean }[] = [];
+        for (let i = 1; i <= 6; i++) {
+            const nextIdx = n - 1 + i;
+            const predictedVal = slope * nextIdx + intercept;
+
+            const futureDate = new Date(now.getFullYear(), now.getMonth() + i + 1, 0); // End of next months
+            future.push({
+                date: futureDate.toISOString().split('T')[0],
+                value: predictedVal,
+                isProjected: true
+            });
+        }
+
+        return [...history, ...future];
     }
 }

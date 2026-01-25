@@ -1,6 +1,7 @@
 
 import React from 'react';
-import { CheckCircle2, ArrowUpRight, ArrowDownRight, Briefcase } from 'lucide-react';
+import { CheckCircle2, ArrowUpRight, ArrowDownRight, Briefcase, ArrowDown, ArrowUp } from 'lucide-react';
+import { formatCurrency } from '../../lib/money';
 import { ReportSnapshot, MetricValue } from '../../lib/reports/types';
 
 const Delta: React.FC<{ val?: number }> = ({ val }) => {
@@ -20,7 +21,7 @@ const Row: React.FC<{ label: string, val: MetricValue, ident?: boolean, bold?: b
         <td className={`px-4 py-2 text-right font-mono ${bold ? 'text-neutral-900' : 'text-neutral-600'}`}>{val.formatted}</td>
         {/* Previous Value Calculation (Derived) */}
         <td className="px-4 py-2 text-right font-mono text-neutral-400">
-            {val.deltaValue !== undefined ? (val.value - val.deltaValue).toLocaleString(undefined, { maximumFractionDigits: 0 }) : '-'}
+            {val.deltaValue !== undefined ? formatCurrency(val.value - val.deltaValue, val.currency, { compact: false }) : '-'}
         </td>
         <td className="px-4 py-2 text-right">
             <Delta val={val.delta} />

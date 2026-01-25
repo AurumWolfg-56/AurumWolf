@@ -4,11 +4,14 @@ import { Transaction } from '../types';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
 
+import { parseSupabaseData } from '../lib/supabaseSafe';
+import { TransactionSchema } from '../lib/validators';
+
 interface TransactionsContextType {
   transactions: Transaction[];
   addTransaction: (tx: Transaction) => Promise<void>;
   updateTransaction: (tx: Transaction) => Promise<void>;
-  deleteTransaction: (id: string) => Promise<void>;
+  deleteTransaction: (id: string) => Promise<boolean>;
   refreshTransactions: (txs: Transaction[]) => void;
   loading: boolean;
 }
@@ -37,21 +40,26 @@ export const TransactionsProvider = ({ children }: { children: ReactNode }) => {
       if (error) {
         console.error('Error fetching transactions:', error);
       } else {
-        const mapped: Transaction[] = (data || []).map((row: any) => ({
+        // Map snake_case (DB) to camelCase (Internal Type) BEFORE validation
+        // casting as any[] to allow mapping
+        const candidates = (data || []).map((row: any) => ({
           ...row,
           accountId: row.account_id,
-          numericAmount: Number(row.amount),
+          numericAmount: Number(row.amount), // Coerce to number
           business_id: row.business_id,
-          // Map snake_case used in DB to camelCase if needed, or update types. 
-          // Types: accountId, numericAmount, isRecurring, recurringFrequency, nextRecurringDate, recurringEndDate
+          // Recurring fields
           isRecurring: row.is_recurring,
           recurringFrequency: row.recurring_frequency,
           nextRecurringDate: row.next_recurring_date,
           recurringEndDate: row.recurring_end_date,
-          // Ensure metadata is spread if used
+          // Metadata
           ...row.metadata
         }));
-        setTransactions(mapped);
+
+        // Validate the mapped objects against our internal Schema
+        const validTransactions = parseSupabaseData(TransactionSchema, candidates, []) as Transaction[];
+
+        setTransactions(validTransactions);
       }
       setLoading(false);
     };
@@ -60,9 +68,13 @@ export const TransactionsProvider = ({ children }: { children: ReactNode }) => {
   }, [user]);
 
   const addTransaction = async (tx: Transaction) => {
+    // 1. Optimistic Update
+    const prevTransactions = [...transactions];
     setTransactions(prev => [tx, ...prev]);
 
-    if (user) {
+    if (!user) return;
+
+    try {
       const dbPayload = {
         id: tx.id,
         user_id: user.id,
@@ -90,14 +102,20 @@ export const TransactionsProvider = ({ children }: { children: ReactNode }) => {
       };
 
       const { error } = await supabase.from('transactions').insert(dbPayload);
-      if (error) console.error("Error adding transaction:", error);
+      if (error) throw error;
+    } catch (err) {
+      console.error("Error adding transaction:", err);
+      setTransactions(prevTransactions);
     }
   };
 
   const updateTransaction = async (tx: Transaction) => {
+    const prevTransactions = [...transactions];
     setTransactions(prev => prev.map(t => t.id === tx.id ? tx : t));
 
-    if (user) {
+    if (!user) return;
+
+    try {
       const dbPayload = {
         account_id: tx.accountId,
         name: tx.name,
@@ -122,16 +140,27 @@ export const TransactionsProvider = ({ children }: { children: ReactNode }) => {
       };
 
       const { error } = await supabase.from('transactions').update(dbPayload).eq('id', tx.id);
-      if (error) console.error("Error updating transaction:", error);
+      if (error) throw error;
+    } catch (err) {
+      console.error("Error updating transaction:", err);
+      setTransactions(prevTransactions);
     }
   };
 
-  const deleteTransaction = async (id: string) => {
+  const deleteTransaction = async (id: string): Promise<boolean> => {
+    const prevTransactions = [...transactions];
     setTransactions(prev => prev.filter(t => t.id !== id));
 
-    if (user) {
+    if (!user) return false;
+
+    try {
       const { error } = await supabase.from('transactions').delete().eq('id', id);
-      if (error) console.error("Error deleting transaction:", error);
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.error("Error deleting transaction:", err);
+      setTransactions(prevTransactions);
+      return false;
     }
   };
 

@@ -10,8 +10,40 @@
   .pt-safe {
     padding-top: env(safe-area-inset-top);
   }
-  
+
   .pb-safe {
     padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Modern Scrollbar - Premium */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-neutral-200 dark:bg-neutral-800 rounded-full hover:bg-gold-500 transition-colors duration-300;
+  }
+}
+
+@layer utilities {
+
+  /* Premium Glassmorphism */
+  .glass {
+    @apply bg-white/80 dark:bg-zinc-950/70 backdrop-blur-xl border-b border-white/10 shadow-sm;
+  }
+
+  /* Glass Card - Subtle for lists */
+  .glass-card {
+    @apply bg-white dark:bg-neutral-900 border border-neutral-100 dark:border-neutral-800 shadow-sm transition-all duration-300;
+  }
+
+  /* Text Gradients */
+  .text-gradient-gold {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-yellow-300 to-yellow-600;
   }
 }

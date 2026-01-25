@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Home, PieChart, Plus, Briefcase, Settings, LogOut, Wallet, History, X, ScanLine, TrendingUp, Menu, FileText } from 'lucide-react';
+import { Home, PieChart, Plus, Briefcase, Settings, LogOut, Wallet, History, X, ScanLine, TrendingUp, Menu, FileText, Eye, EyeOff } from 'lucide-react';
 import { NavTab } from '../types';
 import { Logo } from './Logo';
 
@@ -14,6 +14,9 @@ interface NavigationProps {
   userEmail?: string;
   t: (key: string) => string;
   onSignOut: () => void;
+  isLoading?: boolean;
+  privacyMode?: boolean;
+  onTogglePrivacy?: () => void;
 }
 
 export const Navigation: React.FC<NavigationProps> = ({
@@ -25,28 +28,33 @@ export const Navigation: React.FC<NavigationProps> = ({
   userName = "Guest",
   userEmail,
   t,
-  onSignOut
+  onSignOut,
+  isLoading,
+  privacyMode,
+  onTogglePrivacy
 }) => {
+  // Fix: Ensure 't' is always a function to prevent crashes during HMR/loading
+  const safeT = t || ((k: string) => k);
 
   // Full Desktop & Drawer Nav Items
   const fullNavItems = [
-    { id: 'home', label: t('nav.dashboard'), icon: Home },
-    { id: 'transactions', label: t('nav.history'), icon: History },
-    { id: 'accounts', label: t('nav.accounts'), icon: Wallet },
-    { id: 'budget', label: t('nav.budget'), icon: PieChart },
-    { id: 'investments', label: t('nav.investments'), icon: TrendingUp },
-    { id: 'business', label: t('nav.business'), icon: Briefcase },
-    { id: 'reports', label: t('nav.reports'), icon: FileText },
-    { id: 'settings', label: t('nav.settings'), icon: Settings },
+    { id: 'home', label: safeT('nav.dashboard'), icon: Home },
+    { id: 'transactions', label: safeT('nav.history'), icon: History },
+    { id: 'accounts', label: safeT('nav.accounts'), icon: Wallet },
+    { id: 'budget', label: safeT('nav.budget'), icon: PieChart },
+    { id: 'investments', label: safeT('nav.investments'), icon: TrendingUp },
+    { id: 'business', label: safeT('nav.business'), icon: Briefcase },
+    { id: 'reports', label: safeT('nav.reports'), icon: FileText },
+    { id: 'settings', label: safeT('nav.settings'), icon: Settings },
   ] as const;
 
   // Mobile Bottom Nav Items (5 specific tabs)
   const mobileNavItems = [
-    { id: 'home', label: t('nav.dashboard'), icon: Home },
-    { id: 'transactions', label: t('nav.history'), icon: History },
-    { id: 'scan', label: t('common.scan'), icon: ScanLine, isAction: true },
-    { id: 'business', label: t('nav.business'), icon: Briefcase },
-    { id: 'settings', label: t('nav.settings'), icon: Settings },
+    { id: 'home', label: safeT('nav.dashboard'), icon: Home },
+    { id: 'transactions', label: safeT('nav.history'), icon: History },
+    { id: 'scan', label: safeT('common.scan'), icon: ScanLine, isAction: true },
+    { id: 'business', label: safeT('nav.business'), icon: Briefcase },
+    { id: 'settings', label: safeT('nav.settings'), icon: Settings },
   ];
 
   const handleNavClick = (id: NavTab) => {
@@ -55,11 +63,16 @@ export const Navigation: React.FC<NavigationProps> = ({
   };
 
   const SidebarContent = () => (
-    <div className="flex flex-col h-full bg-neutral-950 border-r border-neutral-900">
+    <div className="flex flex-col h-full bg-neutral-950/50 backdrop-blur-xl border-r border-white/5">
       <div className="p-8 pb-6 flex justify-between items-center shrink-0">
         <div>
-          <Logo iconSize="w-10 h-10" textSize="text-xl" />
-          <p className="text-[10px] text-neutral-500 uppercase tracking-[0.3em] mt-2 ml-1">Wealth Defined</p>
+          <div className="flex items-center gap-2">
+            <Logo iconSize="w-10 h-10" textSize="text-xl" />
+            {isLoading && (
+              <div className="w-2 h-2 rounded-full bg-gold-400 animate-ping" title="Syncing..."></div>
+            )}
+          </div>
+          <p className="text-[10px] text-neutral-500 uppercase tracking-[0.3em] mt-2 ml-1">{safeT('nav.subtitle')}</p>
         </div>
         <button
           onClick={onCloseMobileMenu}
@@ -76,7 +89,7 @@ export const Navigation: React.FC<NavigationProps> = ({
             className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-gold-500 to-gold-400 hover:to-gold-300 text-neutral-900 font-bold py-3.5 px-4 rounded-xl transition-all shadow-lg shadow-gold-500/20 active:scale-95 group"
           >
             <Plus size={18} className="group-hover:rotate-90 transition-transform duration-300" />
-            <span className="tracking-wide">{t('nav.newTransaction')}</span>
+            <span className="tracking-wide">{safeT('nav.newTransaction')}</span>
           </button>
         </div>
 
@@ -88,8 +101,8 @@ export const Navigation: React.FC<NavigationProps> = ({
               key={item.id}
               onClick={() => handleNavClick(item.id as NavTab)}
               className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all duration-300 group relative overflow-hidden ${isActive
-                ? 'bg-neutral-900 border border-neutral-800 text-gold-500 shadow-[0_0_15px_rgba(0,0,0,0.5)]'
-                : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50'
+                ? 'bg-white/5 border border-white/10 text-gold-400 shadow-[0_0_20px_rgba(197,157,95,0.15)] backdrop-blur-md'
+                : 'text-neutral-400 hover:text-neutral-200 hover:bg-white/5'
                 }`}
             >
               <Icon
@@ -105,7 +118,23 @@ export const Navigation: React.FC<NavigationProps> = ({
         })}
       </nav>
 
-      <div className="p-6 border-t border-neutral-900 mt-auto shrink-0">
+      <div className="p-6 border-t border-neutral-900 mt-auto shrink-0 space-y-4">
+        {/* Privacy Toggle (Mobile/Sidebar) */}
+        <button
+          onClick={onTogglePrivacy}
+          className="w-full flex items-center justify-between p-3 rounded-xl bg-neutral-900/30 border border-neutral-800/50 hover:bg-neutral-800 transition-colors group"
+        >
+          <div className="flex items-center gap-3">
+            {privacyMode ? <EyeOff size={18} className="text-gold-500" /> : <Eye size={18} className="text-neutral-500" />}
+            <span className="text-sm font-medium text-neutral-400 group-hover:text-white">
+              {safeT(privacyMode ? 'common.hidden' : 'common.visible') || (privacyMode ? 'Hidden' : 'Visible')} Mode
+            </span>
+          </div>
+          <div className={`w-8 h-4 rounded-full relative transition-colors ${privacyMode ? 'bg-gold-500/20' : 'bg-neutral-800'}`}>
+            <div className={`absolute top-0.5 w-3 h-3 rounded-full transition-all duration-300 ${privacyMode ? 'left-4.5 bg-gold-500' : 'left-0.5 bg-neutral-500'}`} style={{ left: privacyMode ? '1.125rem' : '0.125rem' }}></div>
+          </div>
+        </button>
+
         <div
           onClick={onSignOut}
           className="flex items-center gap-3 p-3 rounded-xl bg-neutral-900/50 border border-neutral-800 hover:border-gold-500/30 transition-colors cursor-pointer group"
@@ -128,7 +157,7 @@ export const Navigation: React.FC<NavigationProps> = ({
   return (
     <>
       {/* --- DESKTOP SIDEBAR --- */}
-      <aside className="hidden md:flex flex-col w-72 fixed left-0 top-0 bottom-0 bg-neutral-950 border-r border-neutral-900 z-50">
+      <aside className="hidden md:block w-72 fixed left-0 top-0 bottom-0 z-50">
         <SidebarContent />
       </aside>
 
@@ -146,7 +175,7 @@ export const Navigation: React.FC<NavigationProps> = ({
       </div>
 
       {/* --- MOBILE BOTTOM NAVIGATION --- */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 h-[80px] bg-neutral-950 border-t border-neutral-900 z-50 pb-safe shadow-[0_-5px_20px_rgba(0,0,0,0.5)]">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 h-[80px] glass z-50 pb-safe shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
         <div className="grid grid-cols-5 h-full relative">
           {mobileNavItems.map((item) => {
             const Icon = item.icon;

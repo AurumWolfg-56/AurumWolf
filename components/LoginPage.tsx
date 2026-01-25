@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { Mail, Lock, AlertCircle, Loader2 } from 'lucide-react';
+import { Mail, Lock, AlertCircle, Loader2, Fingerprint } from 'lucide-react';
+import { useSecurity } from '../contexts/SecurityContext';
 
 import { Logo } from './Logo';
 
@@ -16,6 +17,9 @@ export function LoginPage({ t }: LoginPageProps) {
     const [error, setError] = useState<string | null>(null);
     const [mode, setMode] = useState<'signin' | 'signup' | 'reset'>('signin');
     const [message, setMessage] = useState<string | null>(null);
+
+    // Security Context for Biometrics
+    const { biometricsEnabled, verifyBiometrics } = useSecurity();
 
     const handleAuth = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -56,14 +60,38 @@ export function LoginPage({ t }: LoginPageProps) {
         }
     };
 
+    const handleBiometricLogin = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const verified = await verifyBiometrics();
+            if (verified) {
+                // NOTE: Biometrics confirm local identity but do NOT retrieve Supabase session key.
+                // In a production app with Passkeys, this would retrieve the token.
+                // For now, we flag it as verified.
+                setMessage("Identity Confirmed. Please enter password to resume secure session.");
+            } else {
+                setError("Biometric verification failed.");
+            }
+        } catch (e) {
+            setError("Biometric error.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
-        <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
-            <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-xl">
-                <div className="text-center mb-8 flex flex-col items-center">
-                    <div className="mb-4 transform hover:scale-105 transition-transform duration-500">
-                        <Logo iconSize="w-16 h-16" textSize="text-4xl" />
+        <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 sm:p-6 lg:p-8">
+            <div className="w-full max-w-md bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-3xl p-6 sm:p-10 shadow-2xl relative overflow-hidden">
+                {/* Background Ambient Glow */}
+                <div className="absolute top-[-50%] left-[-20%] w-[300px] h-[300px] bg-gold-500/10 rounded-full blur-[100px] pointer-events-none"></div>
+
+                <div className="text-center mb-8 flex flex-col items-center relative z-10">
+                    <div className="mb-6 transform hover:scale-105 transition-transform duration-500">
+                        {/* Responsive Logo: Smaller on mobile, Larger on desktop */}
+                        <Logo iconSize="w-16 h-16 sm:w-20 sm:h-20" textSize="text-xl sm:text-3xl" stacked={true} />
                     </div>
-                    <p className="text-slate-400">
+                    <p className="text-slate-400 font-medium tracking-wide text-sm uppercase">
                         {mode === 'signin' ? t('auth.signInTitle') : mode === 'reset' ? 'Reset Password' : t('auth.signUpTitle')}
                     </p>
                 </div>
@@ -111,7 +139,7 @@ export function LoginPage({ t }: LoginPageProps) {
                                 required
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
-                                className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-10 pr-4 py-2.5 text-slate-200 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50 transition-all outline-none"
+                                className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl pl-11 pr-4 py-3.5 text-slate-200 focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition-all outline-none placeholder:text-slate-600"
                                 placeholder="you@example.com"
                             />
                         </div>
@@ -129,7 +157,7 @@ export function LoginPage({ t }: LoginPageProps) {
                                     required
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-10 pr-4 py-2.5 text-slate-200 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50 transition-all outline-none"
+                                    className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl pl-11 pr-4 py-3.5 text-slate-200 focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition-all outline-none placeholder:text-slate-600"
                                     placeholder={t('auth.passPlaceholder')}
                                     minLength={6}
                                 />
@@ -152,7 +180,28 @@ export function LoginPage({ t }: LoginPageProps) {
                             t('auth.signUp')
                         )}
                     </button>
+
+
                 </form>
+
+                {/* Biometric Login Button - DISABLED 
+                    Reason: Biometrics confirm local identity but cannot retrieve Supabase session without Passkeys.
+                    This prevents the user loop where they verify biometrics but still need to enter password.
+                 */}
+                {/* 
+                {biometricsEnabled && mode === 'signin' && (
+                    <div className="mt-4">
+                        <button
+                            type="button"
+                            onClick={handleBiometricLogin}
+                            className="w-full bg-slate-800/50 hover:bg-slate-800 text-slate-300 font-medium py-2.5 rounded-lg transition-all flex items-center justify-center gap-2 border border-slate-700"
+                        >
+                            <Fingerprint size={20} className="text-amber-500" />
+                            {t('auth.biometricSignIn') || "Sign in with Biometrics"}
+                        </button>
+                    </div>
+                )}
+                */}
 
                 <div className="mt-6 text-center">
                     <div className="flex flex-col gap-3">

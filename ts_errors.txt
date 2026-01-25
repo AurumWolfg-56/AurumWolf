@@ -1,0 +1,44 @@
+App.tsx(176,9): error TS2322: Type '(id: string) => Promise<boolean>' is not assignable to type '(id: string) => Promise<void>'.
+  Type 'Promise<boolean>' is not assignable to type 'Promise<void>'.
+    Type 'boolean' is not assignable to type 'void'.
+App.tsx(258,25): error TS2740: Type '{ netWorth: number; onNavigate: (tab: NavTab, payload?: any) => void; privacyMode: boolean; baseCurrency: string; t: (key: string) => any; language: Language; assetsByType: Record<...>; ... 6 more ...; healthBreakdown: { ...; }; }' is missing the following properties from type 'DashboardPageProps': transactions, accounts, budgets, investments, and 6 more.
+components/AccountsPage.tsx(325,29): error TS2349: This expression is not callable.
+  Type 'Transaction' has no call signatures.
+components/AccountsPage.tsx(325,73): error TS2349: This expression is not callable.
+  Type 'Transaction' has no call signatures.
+components/BudgetPage.tsx(167,97): error TS2339: Property 'accountName' does not exist on type 'Transaction'.
+components/BusinessPage.tsx(185,105): error TS2339: Property 'format' does not exist on type 'MetricDefinition'.
+components/BusinessPage.tsx(188,111): error TS2339: Property 'format' does not exist on type 'MetricDefinition'.
+components/BusinessPage.tsx(188,297): error TS2339: Property 'format' does not exist on type 'MetricDefinition'.
+components/ConciergeWidget.tsx(520,33): error TS2345: Argument of type '{ category: any; limit: any; currency: string; }' is not assignable to parameter of type 'Omit<BudgetCategory, "id" | "spent">'.
+  Property 'color' is missing in type '{ category: any; limit: any; currency: string; }' but required in type 'Omit<BudgetCategory, "id" | "spent">'.
+components/reports/PerformanceMatrix.tsx(24,92): error TS2339: Property 'currency' does not exist on type 'MetricValue'.
+contexts/AccountsContext.tsx(53,21): error TS2345: Argument of type '{ name: string; type: "business" | "checking" | "savings" | "credit" | "investment" | "crypto"; balance: number; currency: string; id?: string; initialBalance?: number; last4?: string; color?: string; ... 4 more ...; linked_business_id?: string; }[]' is not assignable to parameter of type 'SetStateAction<Account[]>'.
+  Type '{ name: string; type: "business" | "checking" | "savings" | "credit" | "investment" | "crypto"; balance: number; currency: string; id?: string; initialBalance?: number; last4?: string; color?: string; ... 4 more ...; linked_business_id?: string; }[]' is not assignable to type 'Account[]'.
+    Type '{ name: string; type: "business" | "checking" | "savings" | "credit" | "investment" | "crypto"; balance: number; currency: string; id?: string; initialBalance?: number; last4?: string; color?: string; ... 4 more ...; linked_business_id?: string; }' is not assignable to type 'Account'.
+      Property 'id' is optional in type '{ name: string; type: "business" | "checking" | "savings" | "credit" | "investment" | "crypto"; balance: number; currency: string; id?: string; initialBalance?: number; last4?: string; color?: string; ... 4 more ...; linked_business_id?: string; }' but required in type 'Account'.
+contexts/BudgetsContext.tsx(63,24): error TS2345: Argument of type '{ category: string; limit: number; id?: string; spent?: number; color?: string; type?: "income" | "expense"; }[]' is not assignable to parameter of type 'SetStateAction<BudgetCategory[]>'.
+  Type '{ category: string; limit: number; id?: string; spent?: number; color?: string; type?: "income" | "expense"; }[]' is not assignable to type 'BudgetCategory[]'.
+    Type '{ category: string; limit: number; id?: string; spent?: number; color?: string; type?: "income" | "expense"; }' is not assignable to type 'BudgetCategory'.
+      Property 'id' is optional in type '{ category: string; limit: number; id?: string; spent?: number; color?: string; type?: "income" | "expense"; }' but required in type 'BudgetCategory'.
+contexts/BudgetsContext.tsx(84,22): error TS2345: Argument of type '{ name: string; targetAmount: number; savedAmount: number; color: string; id?: string; deadline?: string; }[]' is not assignable to parameter of type 'SetStateAction<SavingsGoal[]>'.
+  Type '{ name: string; targetAmount: number; savedAmount: number; color: string; id?: string; deadline?: string; }[]' is not assignable to type 'SavingsGoal[]'.
+    Type '{ name: string; targetAmount: number; savedAmount: number; color: string; id?: string; deadline?: string; }' is not assignable to type 'SavingsGoal'.
+      Property 'id' is optional in type '{ name: string; targetAmount: number; savedAmount: number; color: string; id?: string; deadline?: string; }' but required in type 'SavingsGoal'.
+contexts/InvestmentsContext.tsx(63,28): error TS2345: Argument of type '{ name: string; type: "crypto" | "real_estate" | "stock" | "etf" | "bond" | "startup" | "commodity"; strategy: "passive" | "active"; quantity: number; costBasis: number; currentPrice: number; ... 7 more ...; notes?: string; }[]' is not assignable to parameter of type 'SetStateAction<Investment[]>'.
+  Type '{ name: string; type: "crypto" | "real_estate" | "stock" | "etf" | "bond" | "startup" | "commodity"; strategy: "passive" | "active"; quantity: number; costBasis: number; currentPrice: number; ... 7 more ...; notes?: string; }[]' is not assignable to type 'Investment[]'.
+    Type '{ name: string; type: "crypto" | "real_estate" | "stock" | "etf" | "bond" | "startup" | "commodity"; strategy: "passive" | "active"; quantity: number; costBasis: number; currentPrice: number; ... 7 more ...; notes?: string; }' is not assignable to type 'Investment'.
+      Property 'id' is optional in type '{ name: string; type: "crypto" | "real_estate" | "stock" | "etf" | "bond" | "startup" | "commodity"; strategy: "passive" | "active"; quantity: number; costBasis: number; currentPrice: number; ... 7 more ...; notes?: string; }' but required in type 'Investment'.
+contexts/TransactionsContext.tsx(62,25): error TS2345: Argument of type '{ name: string; amount: string; currency: string; date: string; category: string; type: "credit" | "debit"; id?: string; accountId?: string; numericAmount?: number; accountCurrency?: string; foreignAmount?: number; ... 8 more ...; recurringEndDate?: string; }[]' is not assignable to parameter of type 'SetStateAction<Transaction[]>'.
+  Type '{ name: string; amount: string; currency: string; date: string; category: string; type: "credit" | "debit"; id?: string; accountId?: string; numericAmount?: number; accountCurrency?: string; foreignAmount?: number; ... 8 more ...; recurringEndDate?: string; }[]' is not assignable to type 'Transaction[]'.
+    Type '{ name: string; amount: string; currency: string; date: string; category: string; type: "credit" | "debit"; id?: string; accountId?: string; numericAmount?: number; accountCurrency?: string; foreignAmount?: number; ... 8 more ...; recurringEndDate?: string; }' is not assignable to type 'Transaction'.
+      Property 'id' is optional in type '{ name: string; amount: string; currency: string; date: string; category: string; type: "credit" | "debit"; id?: string; accountId?: string; numericAmount?: number; accountCurrency?: string; foreignAmount?: number; ... 8 more ...; recurringEndDate?: string; }' but required in type 'Transaction'.
+hooks/useTransactionOperations.ts(86,14): error TS1345: An expression of type 'void' cannot be tested for truthiness.
+lib/ai/contract.test.ts(3,20): error TS2304: Cannot find name 'jest'.
+lib/ai/contract.test.ts(4,1): error TS2304: Cannot find name 'jest'.
+lib/ai/contract.test.ts(13,1): error TS2593: Cannot find name 'describe'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+lib/ai/contract.test.ts(14,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+lib/ai/contract.test.ts(28,9): error TS2304: Cannot find name 'expect'.
+lib/ai/contract.test.ts(29,9): error TS2304: Cannot find name 'expect'.
+lib/ai/contract.test.ts(30,9): error TS2304: Cannot find name 'expect'.
+lib/ai/contract.test.ts(31,9): error TS2304: Cannot find name 'expect'.

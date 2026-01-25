@@ -35,22 +35,24 @@ export function getTxSettlementCurrency(tx: Transaction): string {
  * Standardized currency formatter.
  */
 export function formatCurrency(
-  val: number, 
-  currencyCode: string = 'USD', 
-  options: { privacy?: boolean; compact?: boolean } = {}
+  val: number,
+  currencyCode: string = 'USD',
+  options: { privacy?: boolean; compact?: boolean; locale?: string } = {}
 ): string {
   if (options.privacy) return '••••••••';
-  
+
   if (currencyCode === 'BTC') {
-      return `₿${val.toFixed(4)}`;
+    return `₿${val.toFixed(4)}`;
   }
 
   const currency = CURRENCIES.find(c => c.code === currencyCode) || CURRENCIES[0];
-  
-  return new Intl.NumberFormat(currency.locale, {
+  const locale = options.locale || currency.locale;
+
+  return new Intl.NumberFormat(locale, {
     style: 'currency',
     currency: currencyCode,
-    maximumFractionDigits: 0,
+    minimumFractionDigits: options.compact ? 0 : 2,
+    maximumFractionDigits: options.compact ? 0 : 2,
     notation: options.compact && Math.abs(val) > 1000000 ? "compact" : "standard",
     compactDisplay: "short"
   }).format(val);
@@ -62,7 +64,7 @@ export function formatCurrency(
 export const getCategoriesForBudget = (budgetName: string): string[] => {
   const mapped = BUDGET_MAPPING[budgetName];
   if (mapped) return [...mapped, budgetName];
-  return [budgetName]; 
+  return [budgetName];
 };
 
 /**
@@ -70,10 +72,10 @@ export const getCategoriesForBudget = (budgetName: string): string[] => {
  */
 export function reconcileAccountBalance(account: Account, transactions: Transaction[]): number {
   const startBalance = account.initialBalance || 0;
-  
+
   // Get all transactions for this account
   const accountTxs = transactions.filter(t => t.accountId === account.id);
-  
+
   // Calculate net change
   // Note: Transaction `numericAmount` is already stored in the Account's currency (Settlement Amount)
   const netChange = accountTxs.reduce((acc, t) => {

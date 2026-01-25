@@ -5,6 +5,15 @@
  */
 
 /**
+ * Safely parses a YYYY-MM-DD string into a local Date object.
+ * new Date("2026-01-01") is UTC. new Date(2026, 0, 1) is Local.
+ */
+function parseLocalDate(dateStr: string): Date {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    return new Date(y, m - 1, d);
+}
+
+/**
  * Returns the current date as an ISO string (YYYY-MM-DD) in the user's LOCAL timezone.
  * Using native Date.toISOString() returns UTC, which might be yesterday.
  */
@@ -28,8 +37,8 @@ export function getLocalMonthISO(date: Date = new Date()): string {
  * @param months Number of months to add
  */
 export function addMonthsToDate(dateStr: string, months: number): string {
-    const [y, m, d] = dateStr.split('-').map(Number);
-    const date = new Date(y, m - 1, d); // Month is 0-indexed in JS
+    // Correct usage: Use parseLocalDate
+    const date = parseLocalDate(dateStr);
 
     const expectedMonth = (date.getMonth() + months) % 12;
     date.setMonth(date.getMonth() + months);
@@ -46,7 +55,7 @@ export function addMonthsToDate(dateStr: string, months: number): string {
  * Adds days to a date string
  */
 export function addDaysToDate(dateStr: string, days: number): string {
-    const date = new Date(dateStr);
+    const date = parseLocalDate(dateStr);
     date.setDate(date.getDate() + days); // JS handles overflow automatically for days
     return getLocalDateISO(date);
 }
@@ -55,6 +64,7 @@ export function addDaysToDate(dateStr: string, days: number): string {
  * Adds years to a date string
  */
 export function addYearsToDate(dateStr: string, years: number): string {
+    // Reuse parseLocalDate logic implicitly (the original split code was actually safe, but let's be consistent)
     const [y, m, d] = dateStr.split('-').map(Number);
     const date = new Date(y + years, m - 1, d);
     return getLocalDateISO(date);

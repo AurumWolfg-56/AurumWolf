@@ -18,12 +18,24 @@
     "moduleDetection": "force",
     "allowJs": true,
     "jsx": "react-jsx",
-    "paths": {
-      "@/*": [
-        "./*"
-      ]
-    },
     "allowImportingTsExtensions": true,
     "noEmit": true
-  }
+  },
+  "include": [
+    "App.tsx",
+    "index.tsx",
+    "components/**/*",
+    "contexts/**/*",
+    "lib/**/*",
+    "hooks/**/*",
+    "types.ts",
+    "constants.ts",
+    "vite.config.ts",
+    "vite-env.d.ts"
+  ],
+  "exclude": [
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "node_modules"
+  ]
 }

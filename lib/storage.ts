@@ -9,6 +9,7 @@ export const STORAGE_KEYS = {
   BASE_CURRENCY: 'aurumwolf_base_currency',
   PRIVACY: 'aurumwolf_privacy',
   LANGUAGE: 'aurumwolf_language',
+  NOTIFICATIONS_ENABLED: 'aurumwolf_notifications_enabled',
   VERSION: 'aurumwolf_storage_version'
 } as const;
 

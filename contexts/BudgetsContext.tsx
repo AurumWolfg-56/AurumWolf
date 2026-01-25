@@ -4,6 +4,8 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
 import { BudgetCategory, SavingsGoal } from '../types';
 import { INITIAL_BUDGET_CONFIG, INITIAL_GOALS } from '../constants';
+import { parseSupabaseData } from '../lib/supabaseSafe';
+import { BudgetCategorySchema, SavingsGoalSchema } from '../lib/validators';
 
 interface BudgetsContextType {
     budgets: BudgetCategory[];
@@ -47,24 +49,18 @@ export function BudgetsProvider({ children }: { children: React.ReactNode }) {
 
             if (budgetsError) throw budgetsError;
 
-            if (budgetsData && budgetsData.length > 0) {
-                const mappedBudgets = budgetsData.map(b => ({
-                    id: b.id,
-                    category: b.category,
-                    limit: b.limit_amount, // Map snake_case to camelCase
-                    spent: 0, // Calculated at runtime
-                    color: b.color,
-                    icon: b.icon, // String name
-                    type: b.type
-                }));
-                setBudgets(mappedBudgets);
-            } else {
-                // Initialize default budgets if empty? 
-                // Alternatively, just leave empty. For now, let's leave empty or maybe migrate defaults?
-                // Users might prefer starting fresh or seeing defaults. 
-                // Let's stick to what's in DB.
-                setBudgets([]);
-            }
+            const mappedBudgets = (budgetsData || []).map(b => ({
+                id: b.id,
+                category: b.category,
+                limit: b.limit_amount, // Map snake_case to camelCase
+                spent: 0, // Calculated at runtime
+                color: b.color,
+                icon: b.icon, // String name
+                type: b.type
+            }));
+
+            const validBudgets = parseSupabaseData(BudgetCategorySchema, mappedBudgets, []) as BudgetCategory[];
+            setBudgets(validBudgets);
 
             // Fetch Goals
             const { data: goalsData, error: goalsError } = await supabase
@@ -74,18 +70,18 @@ export function BudgetsProvider({ children }: { children: React.ReactNode }) {
 
             if (goalsError) throw goalsError;
 
-            if (goalsData) {
-                const mappedGoals = goalsData.map(g => ({
-                    id: g.id,
-                    name: g.name,
-                    targetAmount: g.target_amount,
-                    savedAmount: g.saved_amount,
-                    deadline: g.deadline,
-                    color: g.color,
-                    icon: g.icon
-                }));
-                setGoals(mappedGoals);
-            }
+            const mappedGoals = (goalsData || []).map(g => ({
+                id: g.id,
+                name: g.name,
+                targetAmount: g.target_amount,
+                savedAmount: g.saved_amount,
+                deadline: g.deadline,
+                color: g.color,
+                icon: g.icon
+            }));
+
+            const validGoals = parseSupabaseData(SavingsGoalSchema, mappedGoals, []) as SavingsGoal[];
+            setGoals(validGoals);
 
         } catch (err: any) {
             console.error('Error fetching budgets/goals:', err);
@@ -100,6 +96,17 @@ export function BudgetsProvider({ children }: { children: React.ReactNode }) {
     }, [user]);
 
     const addBudget = async (budget: BudgetCategory) => {
+        // Optimistic
+        const prevBudgets = [...budgets];
+        // We rely on the DB to generate the ID normally for new inserts if we don't provide one, 
+        // but for optimistic UI updates we need an ID. 
+        // NOTE: The original code waited for the DB. We will change to Optimistic + Rollback.
+        // If ID is missing, we can't optimistically update easily without generating a temp ID.
+        // Given the existing implementation waited for data, I will keep the WAIT for ID generation 
+        // but add error handling. However, to be truly optimistic, we should generate UUIDs on client.
+        // For now, I will wrap the existing logic in better error handling as a hybrid approach 
+        // because changing ID generation strategy is risky.
+
         if (!user) return;
         try {
             const { data, error } = await supabase
@@ -135,6 +142,9 @@ export function BudgetsProvider({ children }: { children: React.ReactNode }) {
     };
 
     const updateBudget = async (budget: BudgetCategory) => {
+        const prevBudgets = [...budgets];
+        setBudgets(prev => prev.map(b => b.id === budget.id ? { ...budget, spent: b.spent } : b)); // Preserve calculated spent
+
         if (!user) return;
         try {
             const { error } = await supabase
@@ -149,15 +159,17 @@ export function BudgetsProvider({ children }: { children: React.ReactNode }) {
                 .eq('id', budget.id);
 
             if (error) throw error;
-
-            setBudgets(prev => prev.map(b => b.id === budget.id ? { ...budget, spent: 0 } : b));
         } catch (err: any) {
             console.error('Error updating budget:', err);
             setError(err.message);
+            setBudgets(prevBudgets); // Rollback
         }
     };
 
     const deleteBudget = async (id: string) => {
+        const prevBudgets = [...budgets];
+        setBudgets(prev => prev.filter(b => b.id !== id));
+
         if (!user) return;
         try {
             const { error } = await supabase
@@ -166,16 +178,17 @@ export function BudgetsProvider({ children }: { children: React.ReactNode }) {
                 .eq('id', id);
 
             if (error) throw error;
-            setBudgets(prev => prev.filter(b => b.id !== id));
         } catch (err: any) {
             console.error('Error deleting budget:', err);
             setError(err.message);
+            setBudgets(prevBudgets); // Rollback
         }
     };
 
     // Goals
 
     const addGoal = async (goal: SavingsGoal) => {
+        // See comments in addBudget re: ID generation vs Optimistic updates
         if (!user) return;
         try {
             const { data, error } = await supabase
@@ -212,7 +225,11 @@ export function BudgetsProvider({ children }: { children: React.ReactNode }) {
     };
 
     const updateGoal = async (goal: SavingsGoal) => {
+        const prevGoals = [...goals];
+        setGoals(prev => prev.map(g => g.id === goal.id ? goal : g));
+
         if (!user) return;
+
         try {
             const { error } = await supabase
                 .from('goals')
@@ -227,14 +244,17 @@ export function BudgetsProvider({ children }: { children: React.ReactNode }) {
                 .eq('id', goal.id);
 
             if (error) throw error;
-            setGoals(prev => prev.map(g => g.id === goal.id ? goal : g));
         } catch (err: any) {
             console.error('Error updating goal:', err);
             setError(err.message);
+            setGoals(prevGoals); // Rollback
         }
     };
 
     const deleteGoal = async (id: string) => {
+        const prevGoals = [...goals];
+        setGoals(prev => prev.filter(g => g.id !== id));
+
         if (!user) return;
         try {
             const { error } = await supabase
@@ -243,10 +263,10 @@ export function BudgetsProvider({ children }: { children: React.ReactNode }) {
                 .eq('id', id);
 
             if (error) throw error;
-            setGoals(prev => prev.filter(g => g.id !== id));
         } catch (err: any) {
             console.error('Error deleting goal:', err);
             setError(err.message);
+            setGoals(prevGoals); // Rollback
         }
     };
 

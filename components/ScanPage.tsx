@@ -19,12 +19,7 @@ export const ScanPage: React.FC<ScanPageProps> = ({ onScanComplete, onCancel, t 
   const [dragCounter, setDragCounter] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // --- MOCK RECENT SCANS ---
-  const recentScans = [
-    { id: 1, name: 'Uber_Receipt_Oct24.jpg', date: 'Today, 10:42 AM', status: 'processed' },
-    { id: 2, name: 'Apple_Store_Invoice.pdf', date: 'Yesterday, 4:20 PM', status: 'processed' },
-    { id: 3, name: 'Dinner_Nobu.png', date: 'Oct 22, 9:15 PM', status: 'processed' },
-  ];
+
 
   // Unified Scanner Hook
   const [scannedData, setScannedData] = useState<ScannedReceiptData | null>(null);
@@ -32,7 +27,6 @@ export const ScanPage: React.FC<ScanPageProps> = ({ onScanComplete, onCancel, t 
   const [scanPreview, setScanPreview] = useState<string | null>(null);
 
   const { isScanning: isProcessing, scanReceipt } = useReceiptScanner({
-    apiKey: import.meta.env.VITE_GEMINI_API_KEY,
     onScanComplete: (data) => {
       setScannedData(data);
       setReviewModalOpen(true);
@@ -51,6 +45,7 @@ export const ScanPage: React.FC<ScanPageProps> = ({ onScanComplete, onCancel, t 
     // Map to Partial<Transaction>
     const result: Partial<Transaction> = {
       amount: new Intl.NumberFormat('en-US', { style: 'currency', currency: data.currency || 'USD' }).format(data.amount || 0),
+      numericAmount: data.amount || 0,
       currency: data.currency,
       name: data.merchant,
       date: data.date,
@@ -126,7 +121,7 @@ export const ScanPage: React.FC<ScanPageProps> = ({ onScanComplete, onCancel, t 
       {/* Main Drop Zone */}
       <div
         className={`
-            relative flex-1 rounded-3xl border-2 border-dashed transition-all duration-300 flex flex-col items-center justify-center p-8 overflow-hidden group
+            relative flex-1 rounded-[1.5rem] md:rounded-3xl border-2 border-dashed transition-all duration-300 flex flex-col items-center justify-center p-4 md:p-8 overflow-hidden group
             ${isDragging
             ? 'border-gold-500 bg-gold-500/10 scale-[1.02]'
             : 'border-neutral-800 bg-neutral-900/50 hover:bg-neutral-900 hover:border-neutral-700'
@@ -176,10 +171,31 @@ export const ScanPage: React.FC<ScanPageProps> = ({ onScanComplete, onCancel, t 
             </p>
 
             <div className="flex gap-4 pointer-events-auto">
-              <button className="px-5 py-2.5 rounded-xl bg-gold-500 hover:bg-gold-400 text-neutral-950 font-bold text-sm flex items-center gap-2 transition-all shadow-lg hover:shadow-[0_0_20px_rgba(212,175,55,0.3)]">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (fileInputRef.current) {
+                    fileInputRef.current.removeAttribute('capture'); // Reset first
+                    fileInputRef.current.setAttribute('capture', 'environment');
+                    fileInputRef.current.click();
+                  }
+                }}
+                className="px-5 py-2.5 rounded-xl bg-gold-500 hover:bg-gold-400 text-neutral-950 font-bold text-sm flex items-center gap-2 transition-all shadow-lg hover:shadow-[0_0_20px_rgba(212,175,55,0.3)]"
+              >
                 <Camera size={16} /> {t('scan.openCamera')}
               </button>
-              <button className="px-5 py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white font-bold text-sm flex items-center gap-2 border border-neutral-700 transition-all">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (fileInputRef.current) {
+                    fileInputRef.current.removeAttribute('capture');
+                    fileInputRef.current.click();
+                  }
+                }}
+                className="px-5 py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white font-bold text-sm flex items-center gap-2 border border-neutral-700 transition-all"
+              >
                 <ImageIcon size={16} /> {t('scan.uploadFile')}
               </button>
             </div>
@@ -192,26 +208,8 @@ export const ScanPage: React.FC<ScanPageProps> = ({ onScanComplete, onCancel, t 
         </div>
       </div>
 
-      {/* Recent Activity Footer */}
-      <div className="mt-6 shrink-0">
-        <h3 className="text-xs font-bold text-neutral-500 uppercase tracking-wider mb-3 flex items-center gap-2">
-          <FileCheck size={14} /> Recently Processed
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {recentScans.map(scan => (
-            <div key={scan.id} className="bg-neutral-900 border border-neutral-800 p-3 rounded-xl flex items-center gap-3 opacity-60 hover:opacity-100 transition-opacity cursor-pointer">
-              <div className="w-8 h-8 rounded-lg bg-neutral-950 flex items-center justify-center text-neutral-400 border border-neutral-800">
-                <FileText size={14} />
-              </div>
-              <div className="flex-1 overflow-hidden">
-                <p className="text-xs font-bold text-white truncate">{scan.name}</p>
-                <p className="text-[10px] text-neutral-500">{scan.date}</p>
-              </div>
-              <CheckCircle2 size={14} className="text-green-500" />
-            </div>
-          ))}
-        </div>
-      </div>
+      {/* Recent Activity Footer - Only show if we have history (Server side TODO) */}
+      {/* Recent Activity Footer - Removed Mock Data */}
 
       <style>{`
         @keyframes scan {
