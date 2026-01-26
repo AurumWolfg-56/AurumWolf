@@ -1,0 +1,2 @@
+This file should be in the ROOT of the FTP account.
+If you see this, the FTP root is NOT public_html.
