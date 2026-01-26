@@ -1,8 +1,7 @@
 
 import React, { useState, useRef } from 'react';
-import { Camera, Upload, Loader2, CheckCircle2, AlertCircle, X, ShieldCheck } from 'lucide-react';
+import { Camera, Upload, Loader2, CheckCircle2, AlertCircle, X, ShieldCheck, ArrowRight } from 'lucide-react';
 import { useReceiptScanner, ScannedReceiptData } from '../../hooks/useReceiptScanner';
-
 import { useSecurity } from '../../contexts/SecurityContext';
 
 interface DocumentScannerProps {
@@ -25,7 +24,7 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onClose, onSav
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
-            setSecurityBypass(false); // Reset bypass once file is selected
+            setSecurityBypass(false);
             const reader = new FileReader();
             reader.onloadend = () => setPreview(reader.result as string);
             reader.readAsDataURL(file);
@@ -35,7 +34,7 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onClose, onSav
 
     const triggerScanner = (useCamera: boolean) => {
         if (fileInputRef.current) {
-            setSecurityBypass(true); // Bypass lock before opening camera/picker
+            setSecurityBypass(true);
             if (useCamera) {
                 fileInputRef.current.setAttribute('capture', 'environment');
             } else {
@@ -80,12 +79,12 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onClose, onSav
                     </button>
                 </div>
 
-                <div className="p-8">
+                <div className="p-4 md:p-8 max-h-[75vh] md:max-h-[80vh] overflow-y-auto custom-scrollbar">
                     {!preview ? (
                         <div
                             onDragOver={(e) => e.preventDefault()}
                             onDrop={handleDrop}
-                            className="group border-2 border-dashed border-white/10 rounded-2xl p-8 md:p-12 flex flex-col items-center justify-center gap-6 hover:border-[#d4af37]/50 hover:bg-[#d4af37]/5 transition-all text-center"
+                            className="group border-2 border-dashed border-white/10 rounded-2xl p-6 md:p-12 flex flex-col items-center justify-center gap-4 md:gap-6 hover:border-[#d4af37]/50 hover:bg-[#d4af37]/5 transition-all text-center"
                         >
                             <input
                                 type="file"
@@ -95,99 +94,99 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onClose, onSav
                                 accept="image/*,application/pdf"
                             />
 
-                            <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                <Upload className="w-10 h-10 text-white/20 group-hover:text-[#d4af37]" />
+                            <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-white/5 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <Upload className="w-8 h-8 md:w-10 md:h-10 text-white/20 group-hover:text-[#d4af37]" />
                             </div>
 
-                            <div className="space-y-2">
-                                <p className="text-xl font-medium text-white">Capture Receipt</p>
-                                <p className="text-sm text-white/40 max-w-xs mx-auto">Upload an image or use your camera to extract financial details instantly.</p>
+                            <div className="space-y-1">
+                                <p className="text-lg md:text-xl font-medium text-white">Capture Receipt</p>
+                                <p className="text-xs md:text-sm text-white/40 max-w-xs mx-auto">Upload an image or use your camera to extract financial details instantly.</p>
                             </div>
 
-                            <div className="flex flex-col sm:flex-row gap-4 w-full max-w-sm">
+                            <div className="flex flex-col sm:flex-row gap-3 w-full max-w-sm">
                                 <button
                                     onClick={() => triggerScanner(true)}
-                                    className="flex-1 flex items-center justify-center gap-2 bg-[#d4af37] text-black font-bold py-3 rounded-xl hover:bg-[#c4a030] transition-all"
+                                    className="flex-1 flex items-center justify-center gap-2 bg-[#d4af37] text-black font-bold py-3 rounded-xl hover:bg-[#c4a030] transition-all active:scale-95"
                                 >
                                     <Camera size={18} /> Open Camera
                                 </button>
                                 <button
                                     onClick={() => triggerScanner(false)}
-                                    className="flex-1 flex items-center justify-center gap-2 bg-white/10 text-white font-bold py-3 rounded-xl hover:bg-white/20 transition-all border border-white/10"
+                                    className="flex-1 flex items-center justify-center gap-2 bg-white/10 text-white font-bold py-3 rounded-xl hover:bg-white/20 transition-all border border-white/10 active:scale-95"
                                 >
                                     <Upload size={18} /> Upload Image
                                 </button>
                             </div>
 
                             <div className="flex gap-2">
-                                <span className="px-3 py-1 rounded-full bg-white/5 text-[10px] text-white/40 border border-white/10">JPG</span>
-                                <span className="px-3 py-1 rounded-full bg-white/5 text-[10px] text-white/40 border border-white/10">PNG</span>
-                                <span className="px-3 py-1 rounded-full bg-white/5 text-[10px] text-white/40 border border-white/10">PDF</span>
+                                <span className="px-2 py-0.5 rounded-full bg-white/5 text-[9px] text-white/40 border border-white/10 uppercase tracking-tighter">JPG/PNG</span>
+                                <span className="px-2 py-0.5 rounded-full bg-white/5 text-[9px] text-white/40 border border-white/10 uppercase tracking-tighter">PDF</span>
                             </div>
                         </div>
                     ) : (
-                        <div className="grid md:grid-cols-2 gap-8 animate-in slide-in-from-bottom-4 duration-500">
+                        <div className="flex flex-col lg:grid lg:grid-cols-2 gap-6 md:gap-8 animate-in slide-in-from-bottom-4 duration-500">
                             {/* Preview */}
                             <div className="space-y-4">
-                                <div className="aspect-[3/4] rounded-xl overflow-hidden border border-white/10 bg-black relative group">
+                                <div className="aspect-video lg:aspect-[3/4] rounded-xl overflow-hidden border border-white/10 bg-black relative group shadow-inner">
                                     <img src={preview} alt="Scan Preview" className="w-full h-full object-cover" />
                                     {isScanning && (
-                                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center overflow-hidden">
-                                            <div className="w-full h-1 bg-[#d4af37]/50 absolute top-0 shadow-[0_0_20px_#d4af37] animate-scan" />
+                                        <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] flex items-center justify-center overflow-hidden">
+                                            <div className="w-full h-1 bg-[#d4af37] absolute top-0 shadow-[0_0_20px_#d4af37] animate-scan" />
                                             <div className="flex flex-col items-center gap-3">
                                                 <Loader2 className="w-8 h-8 text-[#d4af37] animate-spin" />
-                                                <p className="text-[#d4af37] font-medium tracking-widest text-xs uppercase animate-pulse">Analyzing...</p>
+                                                <p className="text-[#d4af37] font-bold tracking-[0.2em] text-[10px] uppercase animate-pulse">Extracting Intelligence</p>
                                             </div>
                                         </div>
                                     )}
                                 </div>
                                 <button
                                     onClick={() => { setPreview(null); setScannedData(null); }}
-                                    className="w-full py-2 text-xs text-white/40 hover:text-white transition-colors"
+                                    className="w-full py-2 text-[10px] uppercase tracking-widest font-bold text-white/40 hover:text-[#d4af37] transition-colors"
                                 >
-                                    Select different image
+                                    Change Source
                                 </button>
                             </div>
 
                             {/* Data Extraction */}
-                            <div className="flex flex-col h-full">
-                                <div className="flex-1 space-y-4">
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <ShieldCheck className="w-4 h-4 text-[#d4af37]" />
-                                        <h3 className="text-sm font-semibold text-white/80">Extracted Foundation</h3>
-                                    </div>
-
-                                    {error ? (
-                                        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex gap-3 items-start">
-                                            <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
-                                            <p className="text-sm text-red-200/80">{error}</p>
-                                        </div>
-                                    ) : scannedData ? (
-                                        <div className="space-y-3 animate-in fade-in duration-500">
-                                            <Field label="Amount" value={scannedData.amount ? `$${scannedData.amount.toLocaleString()}` : '—'} />
-                                            <Field label="Merchant" value={scannedData.merchant || '—'} />
-                                            <Field label="Date" value={scannedData.date || '—'} />
-                                            <Field label="Category" value={scannedData.category || '—'} />
-                                            <div className="pt-4">
-                                                <div className="flex items-center gap-2 text-[10px] text-[#d4af37] mb-2 font-bold uppercase tracking-widest">
-                                                    <CheckCircle2 className="w-3 h-3" />
-                                                    Verified by AI
-                                                </div>
-                                                <button
-                                                    onClick={() => onSave(scannedData)}
-                                                    className="w-full py-3 bg-[#d4af37] text-black font-bold rounded-xl hover:bg-[#c4a030] transition-all transform hover:scale-[1.02] active:scale-95 shadow-lg shadow-[#d4af37]/20"
-                                                >
-                                                    Continue with these details
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="flex flex-col items-center justify-center h-48 border border-dashed border-white/5 rounded-xl">
-                                            <Loader2 className="w-6 h-6 text-white/10 animate-spin mb-2" />
-                                            <p className="text-xs text-white/20">Waiting for extraction...</p>
-                                        </div>
-                                    )}
+                            <div className="flex flex-col h-full space-y-4">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <ShieldCheck className="w-4 h-4 text-[#d4af37]" />
+                                    <h3 className="text-xs font-bold text-white/80 uppercase tracking-widest">Analysis Results</h3>
                                 </div>
+
+                                {error ? (
+                                    <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex gap-3 items-start">
+                                        <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                                        <p className="text-sm text-red-200/80">{error}</p>
+                                    </div>
+                                ) : scannedData ? (
+                                    <div className="space-y-3 animate-in fade-in duration-500">
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <Field label="Amount" value={scannedData.amount ? `$${scannedData.amount.toLocaleString()}` : '—'} />
+                                            <Field label="Date" value={scannedData.date || '—'} />
+                                        </div>
+                                        <Field label="Merchant" value={scannedData.merchant || '—'} />
+                                        <Field label="Category" value={scannedData.category || '—'} />
+
+                                        <div className="pt-2">
+                                            <div className="flex items-center gap-2 text-[9px] text-[#d4af37] mb-3 font-bold uppercase tracking-[0.2em]">
+                                                <CheckCircle2 className="w-3 h-3" />
+                                                Securely Verified
+                                            </div>
+                                            <button
+                                                onClick={() => onSave(scannedData)}
+                                                className="w-full py-4 bg-[#d4af37] text-black font-bold rounded-xl hover:bg-[#c4a030] transition-all transform active:scale-95 shadow-lg shadow-[#d4af37]/20 flex items-center justify-center gap-2"
+                                            >
+                                                Confirm Transaction <ArrowRight size={18} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center py-12 border border-dashed border-white/5 rounded-xl bg-white/[0.01]">
+                                        <Loader2 className="w-6 h-6 text-white/10 animate-spin mb-3" />
+                                        <p className="text-[10px] text-white/20 uppercase tracking-[0.1em]">Awaiting Data...</p>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}

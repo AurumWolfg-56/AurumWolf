@@ -37,16 +37,19 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     const [biometricsEnabled, setBiometricsEnabled] = useState(() => localStorage.getItem(STORAGE_KEYS.BIOMETRICS_ENABLED) === 'true');
     const [lastBiometricError, setLastBiometricError] = useState<string | null>(null);
     const [isSecurityBypassed, setIsSecurityBypassed] = useState(false);
+    const bypassRef = React.useRef(false); // Synchronous ref for event listeners
 
     // Auto-reset bypass after 60 seconds of inactivity to prevent permanent vulnerability
     const bypassTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
     const setSecurityBypass = (enabled: boolean) => {
         setIsSecurityBypassed(enabled);
+        bypassRef.current = enabled;
         if (bypassTimeoutRef.current) clearTimeout(bypassTimeoutRef.current);
         if (enabled) {
             bypassTimeoutRef.current = setTimeout(() => {
                 setIsSecurityBypassed(false);
+                bypassRef.current = false;
             }, 60000); // 60s max bypass
         }
     };
@@ -213,8 +216,8 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         if (!hasPin) return;
 
         const enforceLock = () => {
-            if (isSecurityBypassed) {
-                console.log("Security: Lock bypassed for active operation");
+            if (bypassRef.current) {
+                console.log("Security: Lock bypassed for active operation (ref check)");
                 return;
             }
             console.log("Security Event: Locking app");
@@ -223,7 +226,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         };
 
         const reEntryCheck = () => {
-            if (isSecurityBypassed) return;
+            if (bypassRef.current) return;
             const now = Date.now();
             const lastActive = parseInt(localStorage.getItem('aurum_last_active') || '0');
 
