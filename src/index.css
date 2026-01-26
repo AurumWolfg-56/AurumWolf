@@ -3,8 +3,10 @@
 @tailwind utilities;
 
 @layer base {
+
+  html,
   body {
-    @apply antialiased transition-colors duration-300 aurora-bg text-white;
+    @apply h-full overflow-y-auto antialiased transition-colors duration-300 aurora-bg text-white;
   }
 
   .pt-safe {
