@@ -32,5 +32,5 @@ jobs:
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           local-dir: ./dist/
-          server-dir: ./public_html/       # Change this if deploying to a subdomain (e.g., ./subdomain/)
+          server-dir: ./                   # Deploy to root of FTP connection
 
