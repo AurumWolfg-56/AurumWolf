@@ -213,7 +213,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
             };
 
             const response = await aiClient.generateContent(
-                'gemini-2.0-flash-exp', // Using 2.0 Flash Exp for best availability
+                'gemini-2.0-flash', // Using 2.0 Flash for best availability
                 [{
                     role: 'user',
                     parts: [{
@@ -288,7 +288,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
 
             // Using the TTS model often available in Gemini (or simulated via correct model config)
             const response = await aiClient.generateContent(
-                "gemini-2.0-flash-exp",
+                "gemini-2.0-flash",
                 [{ parts: [{ text: `Generate spoken audio for this text: "${text}"` }] }], // Note: Actual TTS request structure depends on capabilities. Assuming text-to-speech config is handled by proxy or model.
                 {
                     // If the proxy handles 'speechConfig' correctly for a model that supports it:

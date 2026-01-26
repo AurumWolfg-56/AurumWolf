@@ -111,7 +111,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
 
     try {
       const response = await aiClient.generateContent(
-        'gemini-2.0-flash-exp',
+        'gemini-2.0-flash',
         [{
           role: 'user',
           parts: [{ text: `Locate this merchant: "${merchant}". Return the official address, full business name, and a suggested transaction category from this list: ${categories.map(c => c.category).join(', ')}.` }]

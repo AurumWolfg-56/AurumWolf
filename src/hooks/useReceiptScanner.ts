@@ -34,7 +34,7 @@ export const useReceiptScanner = ({ apiKey, onScanComplete }: UseReceiptScannerP
 
             // 3. Call AI
             const response = await aiClient.generateContent(
-                'gemini-2.0-flash-exp',
+                'gemini-2.0-flash',
                 [
                     {
                         role: 'user',

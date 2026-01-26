@@ -22,16 +22,8 @@
     "noEmit": true
   },
   "include": [
-    "App.tsx",
-    "index.tsx",
-    "components/**/*",
-    "contexts/**/*",
-    "lib/**/*",
-    "hooks/**/*",
-    "types.ts",
-    "constants.ts",
-    "vite.config.ts",
-    "vite-env.d.ts"
+    "src",
+    "vite.config.ts"
   ],
   "exclude": [
     "**/*.test.ts",

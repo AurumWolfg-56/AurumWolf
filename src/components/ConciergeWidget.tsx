@@ -303,7 +303,7 @@ export const ConciergeWidget: React.FC<ConciergeWidgetProps> = ({ transactions, 
 
                         // Send Audio to Geminii via Proxy (Multimodal)
                         const response = await aiClient.generateContent(
-                            'gemini-2.0-flash-exp', // Multimodal model
+                            'gemini-2.0-flash', // Multimodal model
                             [{
                                 role: 'user',
                                 parts: [
@@ -521,7 +521,9 @@ export const ConciergeWidget: React.FC<ConciergeWidgetProps> = ({ transactions, 
                         category: args.category,
                         limit: args.limit,
                         color: 'bg-indigo-500', // Default color
-                        currency: 'USD'
+                        currency: 'USD',
+                        icon_key: 'Tag',
+                        type: 'expense'
                     });
                     setMessages(prev => [...prev, {
                         id: (Date.now() + 1).toString(),
