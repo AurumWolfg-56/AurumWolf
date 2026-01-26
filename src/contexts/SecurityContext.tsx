@@ -166,10 +166,12 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                     localStorage.setItem(STORAGE_KEYS.CREDENTIAL_ID, credential.id);
                     setBiometricsEnabled(true);
                     localStorage.setItem(STORAGE_KEYS.BIOMETRICS_ENABLED, 'true');
+                    alert("Biometrics linked successfully!");
                 }
             } catch (e: any) {
                 console.error("Biometric setup failed", e);
-                alert(`Setup Failed: ${e.message}`);
+                alert(`Setup Failed: ${e.name} - ${e.message}`);
+                setLastBiometricError(e.message);
             }
         } else {
             setBiometricsEnabled(false);
@@ -181,6 +183,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     const removePin = () => {
         localStorage.removeItem(STORAGE_KEYS.PIN_HASH);
         localStorage.removeItem(STORAGE_KEYS.BIOMETRICS_ENABLED);
+        localStorage.removeItem(STORAGE_KEYS.CREDENTIAL_ID);
         localStorage.removeItem('aurum_last_active');
         setHasPin(false);
         setIsLocked(false);
@@ -189,40 +192,43 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         setIsAuthenticated(true);
     };
 
-    // --- CRITICAL: TIME-AWARE RE-ENTRY LOCK ---
+    // --- CRITICAL: ULTRA-STRICT AUTO-LOCK ---
     useEffect(() => {
         if (!hasPin) return;
 
-        const checkSecurityLifecycle = () => {
+        const enforceLock = () => {
+            console.log("Security Event: Locking app");
+            lock();
+            localStorage.setItem('aurum_last_active', Date.now().toString());
+        };
+
+        const reEntryCheck = () => {
             const now = Date.now();
             const lastActive = parseInt(localStorage.getItem('aurum_last_active') || '0');
 
-            if (document.visibilityState === 'hidden' || !document.hasFocus()) {
-                // Instantly lock on hide/blur
-                lock();
-                localStorage.setItem('aurum_last_active', now.toString());
-            } else if (document.visibilityState === 'visible') {
-                // On foregrounding, check how long we were away
-                if (lastActive > 0 && now - lastActive > 5000) {
-                    lock();
+            if (document.visibilityState === 'visible') {
+                if (lastActive > 0 && now - lastActive > 2000) {
+                    enforceLock();
                 }
                 localStorage.setItem('aurum_last_active', now.toString());
+            } else {
+                enforceLock();
             }
         };
 
-        // Listen for all possible exit/re-entry vectors
-        document.addEventListener("visibilitychange", checkSecurityLifecycle);
-        window.addEventListener("pagehide", checkSecurityLifecycle);
-        window.addEventListener("pageshow", checkSecurityLifecycle);
-        window.addEventListener("blur", checkSecurityLifecycle);
-        window.addEventListener("focus", checkSecurityLifecycle);
+        // Aggressive event coverage
+        document.addEventListener("visibilitychange", reEntryCheck);
+        window.addEventListener("pagehide", enforceLock);
+        window.addEventListener("blur", enforceLock);
+        window.addEventListener("beforeunload", enforceLock);
+        window.addEventListener("focus", reEntryCheck);
 
         return () => {
-            document.removeEventListener("visibilitychange", checkSecurityLifecycle);
-            window.removeEventListener("pagehide", checkSecurityLifecycle);
-            window.removeEventListener("pageshow", checkSecurityLifecycle);
-            window.removeEventListener("blur", checkSecurityLifecycle);
-            window.removeEventListener("focus", checkSecurityLifecycle);
+            document.removeEventListener("visibilitychange", reEntryCheck);
+            window.removeEventListener("pagehide", enforceLock);
+            window.removeEventListener("blur", enforceLock);
+            window.removeEventListener("beforeunload", enforceLock);
+            window.removeEventListener("focus", reEntryCheck);
         };
     }, [hasPin]);
 
