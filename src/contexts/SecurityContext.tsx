@@ -25,32 +25,22 @@ const STORAGE_KEYS = {
 };
 
 export function SecurityProvider({ children }: { children: React.ReactNode }) {
+    // Current state is memory-only for security
     const [isLocked, setIsLocked] = useState(() => {
-        // Fix: Synchronous check to prevent "flash of unlocked content"
-        const hasPin = !!localStorage.getItem(STORAGE_KEYS.PIN_HASH);
-        // If PIN exists, check if we have an active unlocked session
-        const sessionUnlocked = sessionStorage.getItem('aurum_unlocked') === 'true';
-        // Locked if PIN exists AND session is NOT unlocked
-        return hasPin && !sessionUnlocked;
+        const pinExists = !!localStorage.getItem(STORAGE_KEYS.PIN_HASH);
+        return pinExists; // Always start locked if a PIN exists
     });
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [hasPin, setHasPin] = useState(() => !!localStorage.getItem(STORAGE_KEYS.PIN_HASH));
-    const [biometricsEnabled, setBiometricsEnabled] = useState(false);
+    const [biometricsEnabled, setBiometricsEnabled] = useState(() => localStorage.getItem(STORAGE_KEYS.BIOMETRICS_ENABLED) === 'true');
     const [lastBiometricError, setLastBiometricError] = useState<string | null>(null);
-
-    useEffect(() => {
-        // Only need to sync non-blocking state here
-        const bioEnabled = localStorage.getItem(STORAGE_KEYS.BIOMETRICS_ENABLED) === 'true';
-        setBiometricsEnabled(bioEnabled);
-    }, []);
 
     // Helper: Hash PIN using SHA-256
     const hashPin = async (pin: string): Promise<string> => {
         const msgBuffer = new TextEncoder().encode(pin);
         const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
         const hashArray = Array.from(new Uint8Array(hashBuffer));
-        const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-        return hashHex;
+        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
     };
 
     const setupPin = async (pin: string) => {
@@ -59,8 +49,6 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         setHasPin(true);
         setIsAuthenticated(true);
         setIsLocked(false);
-        // Mark session as unlocked
-        sessionStorage.setItem('aurum_unlocked', 'true');
     };
 
     const verifyPin = async (inputPin: string): Promise<boolean> => {
@@ -71,54 +59,41 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         if (inputHash === storedHash) {
             setIsAuthenticated(true);
             setIsLocked(false);
-            sessionStorage.setItem('aurum_unlocked', 'true');
             return true;
         }
         return false;
     };
 
-
     const lock = () => {
         if (hasPin) {
             setIsLocked(true);
             setIsAuthenticated(false);
-            sessionStorage.removeItem('aurum_unlocked');
         }
     };
 
     const unlock = () => {
         setIsLocked(false);
         setIsAuthenticated(true);
-        sessionStorage.setItem('aurum_unlocked', 'true');
     };
 
-    // --- UTILITIES FOR BASE64URL ---
+    // --- BIOMETRIC UTILITIES ---
     const bufferToBase64URLString = (buffer: ArrayBuffer): string => {
         const bytes = new Uint8Array(buffer);
         let str = '';
-        for (const charCode of bytes) {
-            str += String.fromCharCode(charCode);
-        }
-        const base64 = btoa(str);
-        return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+        for (const charCode of bytes) str += String.fromCharCode(charCode);
+        return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
     };
 
     const base64URLStringToBuffer = (base64URL: string): ArrayBuffer => {
         const base64 = base64URL.replace(/-/g, '+').replace(/_/g, '/');
         const padLen = (4 - (base64.length % 4)) % 4;
-        const padded = base64 + '='.repeat(padLen);
-        const binary = atob(padded);
+        const binary = atob(base64 + '='.repeat(padLen));
         const bytes = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) {
-            bytes[i] = binary.charCodeAt(i);
-        }
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
         return bytes.buffer;
     };
 
-    // Helper: Simple Random Challenge
-    const getChallenge = () => {
-        return crypto.getRandomValues(new Uint8Array(32));
-    };
+    const getChallenge = () => crypto.getRandomValues(new Uint8Array(32));
 
     const verifyBiometrics = async (): Promise<boolean> => {
         if (!window.PublicKeyCredential) return false;
@@ -128,7 +103,6 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             const allowCredentials: PublicKeyCredentialDescriptor[] = savedCredentialId ? [{
                 type: 'public-key',
                 id: base64URLStringToBuffer(savedCredentialId),
-                transports: ['internal']
             }] : [];
 
             const assertion = await navigator.credentials.get({
@@ -143,16 +117,15 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             if (assertion) {
                 setIsAuthenticated(true);
                 setIsLocked(false);
-                sessionStorage.setItem('aurum_unlocked', 'true');
                 setLastBiometricError(null);
                 return true;
             }
         } catch (error: any) {
             console.error("Biometric verification failed", error);
             if (error.name === 'NotAllowedError') {
-                setLastBiometricError('Verification Canceled');
+                setLastBiometricError('Canceled');
             } else {
-                setLastBiometricError(error.message || 'Verification Failed');
+                setLastBiometricError('Failed');
             }
         }
         return false;
@@ -161,12 +134,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     const toggleBiometrics = async (enabled: boolean) => {
         if (enabled) {
             if (!window.isSecureContext) {
-                alert("Biometrics require a secure HTTPS connection.");
-                return;
-            }
-
-            if (!window.PublicKeyCredential) {
-                alert("Biometrics not supported on this device.");
+                alert("HTTPS required for biometrics.");
                 return;
             }
 
@@ -181,16 +149,14 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                             displayName: "AurumWolf Member"
                         },
                         pubKeyCredParams: [
-                            { alg: -7, type: "public-key" },
-                            { alg: -257, type: "public-key" }
+                            { alg: -7, type: "public-key" }, // ES256
+                            { alg: -257, type: "public-key" } // RS256
                         ],
                         authenticatorSelection: {
                             authenticatorAttachment: "platform",
                             userVerification: "required",
-                            residentKey: "discouraged"
                         },
                         timeout: 60000,
-                        attestation: "none"
                     }
                 }) as PublicKeyCredential;
 
@@ -200,8 +166,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                     localStorage.setItem(STORAGE_KEYS.BIOMETRICS_ENABLED, 'true');
                 }
             } catch (e: any) {
-                console.error("Biometric enrollment failed", e);
-                setLastBiometricError(e.message);
+                console.error("Biometric setup failed", e);
                 alert(`Setup Failed: ${e.message}`);
             }
         } else {
@@ -216,45 +181,29 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         localStorage.removeItem(STORAGE_KEYS.BIOMETRICS_ENABLED);
         setHasPin(false);
         setIsLocked(false);
-        setIsLocked(false);
         setBiometricsEnabled(false);
         setLastBiometricError(null);
-        setIsAuthenticated(true); // Don't lock them out when removing security
+        setIsAuthenticated(true);
     };
 
-    // --- BACKGROUND LOCKING ---
+    // --- CRITICAL: HIGH-GRADE AUTO-LOCK ---
     useEffect(() => {
-        // Financial Grade Security: Lock when app is backgrounded
-        let lockTimer: NodeJS.Timeout;
+        if (!hasPin) return;
 
-        const handleVisibilityChange = () => {
+        const handleSecurityLock = () => {
             if (document.visibilityState === 'hidden') {
-                // User left the app. Start a grace timer (e.g. 5 seconds for accidental swipes)
-                // If they don't return within 5s, we lock.
-                if (hasPin && !isLocked) {
-                    // Using a short timeout to allow quick app switching (e.g. to password manager)
-                    // but ensuring security. 
-                    // User Request: "si sales... estas cerrando". Implies strictness.
-                    // Setting to 2 seconds for very strict feel.
-                    lockTimer = setTimeout(() => {
-                        lock();
-                    }, 5000);
-                }
-            } else {
-                // User returned.
-                if (lockTimer) {
-                    clearTimeout(lockTimer);
-                }
+                lock();
             }
         };
 
-        document.addEventListener("visibilitychange", handleVisibilityChange);
+        document.addEventListener("visibilitychange", handleSecurityLock);
+        window.addEventListener("pagehide", handleSecurityLock);
 
         return () => {
-            document.removeEventListener("visibilitychange", handleVisibilityChange);
-            if (lockTimer) clearTimeout(lockTimer);
+            document.removeEventListener("visibilitychange", handleSecurityLock);
+            window.removeEventListener("pagehide", handleSecurityLock);
         };
-    }, [hasPin, isLocked]);
+    }, [hasPin]);
 
     return (
         <SecurityContext.Provider value={{
@@ -278,8 +227,6 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
 
 export const useSecurity = () => {
     const context = useContext(SecurityContext);
-    if (!context) {
-        throw new Error("useSecurity must be used within SecurityProvider");
-    }
+    if (!context) throw new Error("useSecurity must be used within SecurityProvider");
     return context;
 };

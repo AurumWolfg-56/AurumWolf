@@ -63,10 +63,11 @@ export const AppLock: React.FC = () => {
         const success = await verifyBiometrics();
         if (success) {
             setBioMsg('Success');
+            // unlock() is called by context on success, but we can call it here for double safety
             unlock();
         } else {
-            // Use specific error from context if available, otherwise generic
-            setBioMsg(lastBiometricError || 'Not Recognized');
+            console.log("Biometric failure or cancelation");
+            setBioMsg(lastBiometricError || 'Retry');
             setTimeout(() => setBioMsg(''), 2500);
         }
     };
@@ -126,17 +127,27 @@ export const AppLock: React.FC = () => {
             </div>
 
             {/* PRIMARY BIOMETRIC BUTTON */}
-            {biometricsEnabled && isBiometricAvailable && (
+            {biometricsEnabled && (
                 <button
                     onClick={handleBiometricUnlock}
                     className="w-full max-w-[260px] py-4 rounded-2xl bg-gold-500 text-neutral-950 font-bold text-lg flex items-center justify-center gap-3 shadow-[0_0_30px_rgba(212,175,55,0.2)] hover:shadow-[0_0_40px_rgba(212,175,55,0.4)] transition-all transform hover:scale-[1.02] active:scale-[0.98]"
                 >
                     <Fingerprint size={24} />
-                    Unlock with FaceID
+                    {isBiometricAvailable ? 'Authenticate' : 'Re-enable Biometrics'}
                 </button>
             )}
 
-            {bioMsg && <div className="text-sm font-bold text-gold-500 mt-4 animate-pulse">{bioMsg}</div>}
+            {bioMsg && (
+                <div className={`text-sm font-bold mt-4 animate-pulse ${bioMsg === 'Success' ? 'text-green-500' : 'text-gold-500'}`}>
+                    {bioMsg}
+                </div>
+            )}
+
+            {!isBiometricAvailable && biometricsEnabled && (
+                <p className="text-[10px] text-neutral-500 mt-4 text-center max-w-[200px]">
+                    Biometric hardware temporarily unavailable or permission denied.
+                </p>
+            )}
         </div>
     );
 };
