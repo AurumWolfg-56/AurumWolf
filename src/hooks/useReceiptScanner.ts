@@ -41,7 +41,7 @@ export const useReceiptScanner = ({ apiKey, onScanComplete }: UseReceiptScannerP
                         parts: [
                             { inlineData: { mimeType: 'image/jpeg', data: resizedBase64 } },
                             {
-                                text: `Analyze this receipt image. Extract the followings details:
+                                text: `Analyze this receipt image. Extract as many details as possible:
                                 - Total Amount (number only)
                                 - Currency Code (ISO format like USD, MXN)
                                 - Merchant Name
@@ -49,7 +49,7 @@ export const useReceiptScanner = ({ apiKey, onScanComplete }: UseReceiptScannerP
                                 - Category (Choose best from: ${CATEGORIES.map(c => c.category).join(', ')})
                                 - Description (Brief summary of items)
                                 
-                                If a field is not visible, leave it null.`
+                                Return null for any field that cannot be clearly identified.`
                             }
                         ]
                     }
@@ -59,14 +59,14 @@ export const useReceiptScanner = ({ apiKey, onScanComplete }: UseReceiptScannerP
                     responseSchema: {
                         type: "OBJECT",
                         properties: {
-                            amount: { type: "NUMBER", description: "Total transaction amount" },
-                            currency: { type: "STRING", description: "ISO 4217 currency code" },
-                            merchant: { type: "STRING", description: "Name of the merchant or business" },
-                            date: { type: "STRING", description: "Transaction date in YYYY-MM-DD format" },
-                            category: { type: "STRING", description: "Best matching category" },
-                            description: { type: "STRING", description: "Short description of purchased items" }
-                        },
-                        required: ["amount", "merchant", "date", "currency"]
+                            amount: { type: "NUMBER", description: "Total transaction amount", nullable: true },
+                            currency: { type: "STRING", description: "ISO 4217 currency code", nullable: true },
+                            merchant: { type: "STRING", description: "Name of the merchant or business", nullable: true },
+                            date: { type: "STRING", description: "Transaction date in YYYY-MM-DD format", nullable: true },
+                            category: { type: "STRING", description: "Best matching category", nullable: true },
+                            description: { type: "STRING", description: "Short description of purchased items", nullable: true }
+                        }
+                        // removed required array to allow partial extraction
                     }
                 }
             );
