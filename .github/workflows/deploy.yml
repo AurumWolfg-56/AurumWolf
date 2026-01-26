@@ -35,5 +35,5 @@ jobs:
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           local-dir: ./dist/
-          server-dir: ./                   # Deploy to root of FTP connection
+          server-dir: ./public_html/       # Deploy to public_html folder
           log-level: verbose
