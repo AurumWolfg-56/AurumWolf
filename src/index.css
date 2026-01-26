@@ -44,12 +44,12 @@
 
   /* Aurora Background */
   .aurora-bg {
-    @apply relative overflow-hidden bg-neutral-950;
+    @apply relative min-h-screen bg-neutral-950 overflow-x-hidden;
   }
 
   .aurora-bg::before {
     content: '';
-    @apply absolute top-[-50%] left-[-50%] w-[200%] h-[200%] animate-aurora-spin bg-aurora opacity-20 blur-[120px] pointer-events-none;
+    @apply fixed top-[-50%] left-[-50%] w-[200%] h-[200%] animate-aurora-spin bg-aurora opacity-20 blur-[120px] pointer-events-none -z-10;
   }
 
   /* Text Gradients */
