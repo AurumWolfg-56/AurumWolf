@@ -35,5 +35,6 @@ jobs:
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           local-dir: ./dist/
-          server-dir: ./public_html/       # Deploy to public_html folder
+          server-dir: ./
+          dangerous-clean-slate: true      # This will delete existing files before upload to ensure a fresh state
           log-level: verbose
