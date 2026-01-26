@@ -147,7 +147,7 @@ export const ScanPage: React.FC<ScanPageProps> = ({ onScanComplete, onCancel, t 
               <div className="absolute inset-0 bg-gold-500 blur-xl opacity-20 animate-pulse"></div>
               <ScanLine size={64} className="text-gold-500 animate-pulse relative z-10" />
               {/* Scanning Line Animation */}
-              <div className="absolute top-0 left-0 w-full h-1 bg-gold-400 shadow-[0_0_15px_#D4AF37] animate-[scan_2s_ease-in-out_infinite]"></div>
+              <div className="absolute top-0 left-0 w-full h-1 bg-gold-400 shadow-[0_0_15px_#D4AF37] animate-scan"></div>
             </div>
             <h3 className="text-xl font-bold text-white mb-2">{t('scan.analyzing')}</h3>
             <p className="text-neutral-500 text-sm flex items-center gap-2">
@@ -176,7 +176,7 @@ export const ScanPage: React.FC<ScanPageProps> = ({ onScanComplete, onCancel, t 
                 onClick={(e) => {
                   e.stopPropagation();
                   if (fileInputRef.current) {
-                    fileInputRef.current.removeAttribute('capture'); // Reset first
+                    fileInputRef.current.removeAttribute('capture');
                     fileInputRef.current.setAttribute('capture', 'environment');
                     fileInputRef.current.click();
                   }
@@ -207,18 +207,6 @@ export const ScanPage: React.FC<ScanPageProps> = ({ onScanComplete, onCancel, t 
           style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, rgba(255,255,255,0.15) 1px, transparent 0)', backgroundSize: '24px 24px' }}>
         </div>
       </div>
-
-      {/* Recent Activity Footer - Only show if we have history (Server side TODO) */}
-      {/* Recent Activity Footer - Removed Mock Data */}
-
-      <style>{`
-        @keyframes scan {
-            0% { top: 0; opacity: 0; }
-            10% { opacity: 1; }
-            90% { opacity: 1; }
-            100% { top: 100%; opacity: 0; }
-        }
-      `}</style>
 
       {/* Verification Modal */}
       <ReceiptReviewModal

@@ -10,6 +10,7 @@ import { CurrencyConverter } from './CurrencyConverter';
 import { Type } from "@google/genai";
 import { RecentActivity } from './RecentActivity';
 import { FinancialBreakdown } from './FinancialBreakdown';
+import { DocumentScanner } from './Scanner/DocumentScanner';
 
 // ... (other imports)
 
@@ -169,6 +170,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [isPlaying, setIsPlaying] = useState(false);
     const [isConverterOpen, setIsConverterOpen] = useState(false);
+    const [isScannerOpen, setIsScannerOpen] = useState(false);
     const [isScoreModalOpen, setIsScoreModalOpen] = useState(false);
     const [insights, setInsights] = useState<Insight[]>(INITIAL_INSIGHTS);
 
@@ -371,6 +373,19 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                 t={t}
             />
 
+            {isScannerOpen && (
+                <DocumentScanner
+                    onClose={() => setIsScannerOpen(false)}
+                    onSave={(data) => {
+                        setIsScannerOpen(false);
+                        // Trigger the parent's logic to open transaction form with scanned data
+                        if (onNavigate) {
+                            onNavigate('transactions', { action: 'scanned', data });
+                        }
+                    }}
+                />
+            )}
+
             <div className="relative min-h-screen pb-20 md:pb-0">
                 {/* ... (backgrounds) ... */}
                 <div className="fixed inset-0 pointer-events-none">
@@ -518,7 +533,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                         <div className="md:col-span-1 xl:col-span-3 glass rounded-[1.5rem] md:rounded-[2.5rem] p-5 md:p-8 shadow-xl flex flex-col justify-center group hover:border-gold-500/20 transition-colors duration-500">
                             <h3 className="text-xs font-bold text-neutral-400 uppercase tracking-wider mb-6 ml-1">{t('dashboard.quickActions')}</h3>
                             <div className="grid grid-cols-2 gap-3 md:gap-4 h-full">
-                                <button onClick={() => onNavigate('scan')} className="col-span-2 flex flex-row items-center justify-between px-6 py-4 rounded-[2rem] bg-gradient-to-r from-gold-500 to-gold-400 text-white shadow-xl shadow-gold-500/20 transition-all hover:scale-[1.02] active:scale-95 group/btn relative overflow-hidden">
+                                <button onClick={() => setIsScannerOpen(true)} className="col-span-2 flex flex-row items-center justify-between px-6 py-4 rounded-[2rem] bg-gradient-to-r from-gold-500 to-gold-400 text-white shadow-xl shadow-gold-500/20 transition-all hover:scale-[1.02] active:scale-95 group/btn relative overflow-hidden">
                                     <div className="absolute inset-0 bg-white/20 translate-y-full group-hover/btn:translate-y-0 transition-transform duration-500 ease-out"></div>
                                     <div className="relative z-10 flex items-center gap-3">
                                         <div className="p-2 bg-white/20 rounded-full backdrop-blur-sm">
