@@ -33,4 +33,4 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           local-dir: ./dist/
           server-dir: ./public_html/       # Change this if deploying to a subdomain (e.g., ./subdomain/)
-          dangerously-force-truthful-lftp: true # Recommended for Hostinger stability
+          server-dir: ./public_html/       # Change this if deploying to a subdomain (e.g., ./subdomain/)
