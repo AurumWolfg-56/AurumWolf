@@ -186,24 +186,45 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         setIsAuthenticated(true);
     };
 
-    // --- CRITICAL: HIGH-GRADE AUTO-LOCK ---
+    // --- CRITICAL: HIGH-GRADE AUTO-LOCK (Event-based) ---
     useEffect(() => {
         if (!hasPin) return;
 
         const handleSecurityLock = () => {
-            if (document.visibilityState === 'hidden') {
+            if (document.visibilityState === 'hidden' || !document.hasFocus()) {
                 lock();
             }
         };
 
         document.addEventListener("visibilitychange", handleSecurityLock);
         window.addEventListener("pagehide", handleSecurityLock);
+        window.addEventListener("blur", handleSecurityLock);
 
         return () => {
             document.removeEventListener("visibilitychange", handleSecurityLock);
             window.removeEventListener("pagehide", handleSecurityLock);
+            window.removeEventListener("blur", handleSecurityLock);
         };
     }, [hasPin]);
+
+    // --- SECONDARY: HEARTBEAT LOCK (For persistent processes) ---
+    useEffect(() => {
+        if (!hasPin || isLocked) return;
+
+        const interval = setInterval(() => {
+            const now = Date.now();
+            const lastActive = parseInt(localStorage.getItem('aurum_last_active') || '0');
+
+            // If more than 5 seconds passed since last heartbeat, we probably were backgrounded
+            if (lastActive > 0 && now - lastActive > 10000) {
+                lock();
+            } else {
+                localStorage.setItem('aurum_last_active', now.toString());
+            }
+        }, 2000);
+
+        return () => clearInterval(interval);
+    }, [hasPin, isLocked]);
 
     return (
         <SecurityContext.Provider value={{
