@@ -100,6 +100,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
 
         try {
             const savedCredentialId = localStorage.getItem(STORAGE_KEYS.CREDENTIAL_ID);
+            // Broaden compatibility: removing explicit 'transports' to allow any platform authenticator
             const allowCredentials: PublicKeyCredentialDescriptor[] = savedCredentialId ? [{
                 type: 'public-key',
                 id: base64URLStringToBuffer(savedCredentialId),
@@ -155,6 +156,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                         authenticatorSelection: {
                             authenticatorAttachment: "platform",
                             userVerification: "required",
+                            residentKey: "discouraged"
                         },
                         timeout: 60000,
                     }
@@ -179,6 +181,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     const removePin = () => {
         localStorage.removeItem(STORAGE_KEYS.PIN_HASH);
         localStorage.removeItem(STORAGE_KEYS.BIOMETRICS_ENABLED);
+        localStorage.removeItem('aurum_last_active');
         setHasPin(false);
         setIsLocked(false);
         setBiometricsEnabled(false);
@@ -186,43 +189,49 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         setIsAuthenticated(true);
     };
 
-    // --- CRITICAL: HIGH-GRADE AUTO-LOCK (Event-based) ---
+    // --- CRITICAL: TIME-AWARE RE-ENTRY LOCK ---
     useEffect(() => {
         if (!hasPin) return;
 
-        const handleSecurityLock = () => {
-            if (document.visibilityState === 'hidden' || !document.hasFocus()) {
-                lock();
-            }
-        };
-
-        document.addEventListener("visibilitychange", handleSecurityLock);
-        window.addEventListener("pagehide", handleSecurityLock);
-        window.addEventListener("blur", handleSecurityLock);
-
-        return () => {
-            document.removeEventListener("visibilitychange", handleSecurityLock);
-            window.removeEventListener("pagehide", handleSecurityLock);
-            window.removeEventListener("blur", handleSecurityLock);
-        };
-    }, [hasPin]);
-
-    // --- SECONDARY: HEARTBEAT LOCK (For persistent processes) ---
-    useEffect(() => {
-        if (!hasPin || isLocked) return;
-
-        const interval = setInterval(() => {
+        const checkSecurityLifecycle = () => {
             const now = Date.now();
             const lastActive = parseInt(localStorage.getItem('aurum_last_active') || '0');
 
-            // If more than 5 seconds passed since last heartbeat, we probably were backgrounded
-            if (lastActive > 0 && now - lastActive > 10000) {
+            if (document.visibilityState === 'hidden' || !document.hasFocus()) {
+                // Instantly lock on hide/blur
                 lock();
-            } else {
+                localStorage.setItem('aurum_last_active', now.toString());
+            } else if (document.visibilityState === 'visible') {
+                // On foregrounding, check how long we were away
+                if (lastActive > 0 && now - lastActive > 5000) {
+                    lock();
+                }
                 localStorage.setItem('aurum_last_active', now.toString());
             }
-        }, 2000);
+        };
 
+        // Listen for all possible exit/re-entry vectors
+        document.addEventListener("visibilitychange", checkSecurityLifecycle);
+        window.addEventListener("pagehide", checkSecurityLifecycle);
+        window.addEventListener("pageshow", checkSecurityLifecycle);
+        window.addEventListener("blur", checkSecurityLifecycle);
+        window.addEventListener("focus", checkSecurityLifecycle);
+
+        return () => {
+            document.removeEventListener("visibilitychange", checkSecurityLifecycle);
+            window.removeEventListener("pagehide", checkSecurityLifecycle);
+            window.removeEventListener("pageshow", checkSecurityLifecycle);
+            window.removeEventListener("blur", checkSecurityLifecycle);
+            window.removeEventListener("focus", checkSecurityLifecycle);
+        };
+    }, [hasPin]);
+
+    // Constant heartbeat to keep 'last_active' fresh while app is open
+    useEffect(() => {
+        if (!hasPin || isLocked) return;
+        const interval = setInterval(() => {
+            localStorage.setItem('aurum_last_active', Date.now().toString());
+        }, 1000);
         return () => clearInterval(interval);
     }, [hasPin, isLocked]);
 
