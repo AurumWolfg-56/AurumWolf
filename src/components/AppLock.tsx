@@ -24,12 +24,13 @@ export const AppLock: React.FC = () => {
         }
     }, [pin]);
 
-    // Auto-prompt on mount
+    // Auto-prompt on mount or when coming back to foreground
     useEffect(() => {
         if (isLocked && biometricsEnabled && isBiometricAvailable) {
+            // Check if we should prompt immediately
             const timer = setTimeout(() => {
                 handleBiometricUnlock();
-            }, 500);
+            }, 300);
             return () => clearTimeout(timer);
         }
     }, [isBiometricAvailable, biometricsEnabled, isLocked]);
