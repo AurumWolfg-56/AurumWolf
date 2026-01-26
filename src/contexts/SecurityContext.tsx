@@ -125,23 +125,17 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
 
         try {
             const savedCredentialId = localStorage.getItem(STORAGE_KEYS.CREDENTIAL_ID);
-
-            // If we have a saved ID, we should strictly ask for it.
-            // If not, we fall back to empty allowList (resident key check), though less reliable.
             const allowCredentials: PublicKeyCredentialDescriptor[] = savedCredentialId ? [{
                 type: 'public-key',
                 id: base64URLStringToBuffer(savedCredentialId),
-                transports: ['internal', 'hybrid']
+                transports: ['internal']
             }] : [];
 
-            // This triggers the OS FaceID/TouchID/Windows Hello prompt
             const assertion = await navigator.credentials.get({
                 publicKey: {
                     challenge: getChallenge(),
-                    // Remove explicit rpId to respect origin defaults (fix for mobile/local dev)
-                    // rpId: window.location.hostname, 
                     allowCredentials: allowCredentials.length > 0 ? allowCredentials : undefined,
-                    userVerification: "preferred",
+                    userVerification: "required",
                     timeout: 60000,
                 }
             });
@@ -155,13 +149,10 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             }
         } catch (error: any) {
             console.error("Biometric verification failed", error);
-
             if (error.name === 'NotAllowedError') {
-                setLastBiometricError('Biometrics Canceled or Timed Out');
-            } else if (error.name === 'NotSupportedError') {
-                setLastBiometricError('Biometrics Not Supported');
+                setLastBiometricError('Verification Canceled');
             } else {
-                setLastBiometricError(`${error.name}: ${error.message}`);
+                setLastBiometricError(error.message || 'Verification Failed');
             }
         }
         return false;
@@ -169,38 +160,34 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
 
     const toggleBiometrics = async (enabled: boolean) => {
         if (enabled) {
-            // SECURITY CHECK: WebAuthn requires Secure Context (HTTPS or localhost)
             if (!window.isSecureContext) {
-                const msg = `Security Error: Biometrics REQUIRE a secure connection (HTTPS).\nYou are currently on: ${window.location.protocol}//${window.location.hostname}\nPlease use an HTTPS connection or localhost.`;
-                alert(msg);
-                setLastBiometricError("Insecure Context (HTTP)");
+                alert("Biometrics require a secure HTTPS connection.");
                 return;
             }
 
             if (!window.PublicKeyCredential) {
-                alert("Biometrics not supported on this device/browser.");
+                alert("Biometrics not supported on this device.");
                 return;
             }
 
             try {
-                // Try to create a credential to verify platform capability and permission
                 const credential = await navigator.credentials.create({
                     publicKey: {
                         challenge: getChallenge(),
-                        rp: { name: "AurumWolf" }, // Implicitly uses current origin as RP ID
+                        rp: { name: "AurumWolf", id: window.location.hostname },
                         user: {
                             id: crypto.getRandomValues(new Uint8Array(16)),
                             name: "user@aurumwolf.app",
-                            displayName: "AurumWolf User"
+                            displayName: "AurumWolf Member"
                         },
                         pubKeyCredParams: [
-                            { alg: -7, type: "public-key" }, // ES256
-                            { alg: -257, type: "public-key" } // RS256
+                            { alg: -7, type: "public-key" },
+                            { alg: -257, type: "public-key" }
                         ],
                         authenticatorSelection: {
                             authenticatorAttachment: "platform",
-                            userVerification: "preferred", // Changed from 'required' to reduce friction
-                            requireResidentKey: false
+                            userVerification: "required",
+                            residentKey: "discouraged"
                         },
                         timeout: 60000,
                         attestation: "none"
@@ -208,22 +195,17 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 }) as PublicKeyCredential;
 
                 if (credential) {
-                    // Save the credential ID to reuse during verification
-                    localStorage.setItem(STORAGE_KEYS.CREDENTIAL_ID, credential.id); // credential.id is base64url string
-
+                    localStorage.setItem(STORAGE_KEYS.CREDENTIAL_ID, credential.id);
                     setBiometricsEnabled(true);
                     localStorage.setItem(STORAGE_KEYS.BIOMETRICS_ENABLED, 'true');
                 }
             } catch (e: any) {
                 console.error("Biometric enrollment failed", e);
-                setLastBiometricError(`Enrollment: ${e.name} - ${e.message}`);
-                // Debug Alert for Mobile
-                alert(`Biometric Setup Failed: ${e.name} - ${e.message}`);
-                return;
+                setLastBiometricError(e.message);
+                alert(`Setup Failed: ${e.message}`);
             }
         } else {
             setBiometricsEnabled(false);
-            setLastBiometricError(null);
             localStorage.setItem(STORAGE_KEYS.BIOMETRICS_ENABLED, 'false');
             localStorage.removeItem(STORAGE_KEYS.CREDENTIAL_ID);
         }

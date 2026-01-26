@@ -24,6 +24,16 @@ export const AppLock: React.FC = () => {
         }
     }, [pin]);
 
+    // Auto-prompt on mount
+    useEffect(() => {
+        if (isLocked && biometricsEnabled && isBiometricAvailable) {
+            const timer = setTimeout(() => {
+                handleBiometricUnlock();
+            }, 500);
+            return () => clearTimeout(timer);
+        }
+    }, [isBiometricAvailable, biometricsEnabled, isLocked]);
+
     const handleVerify = async (inputPin: string) => {
         const isValid = await verifyPin(inputPin);
         if (isValid) {

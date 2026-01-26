@@ -386,21 +386,43 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                </div>
                <div className="divide-y divide-neutral-200 dark:divide-neutral-800 transition-colors">
 
-                  <div className="p-4 flex items-center justify-between hover:bg-neutral-50 dark:hover:bg-neutral-800/30 transition-colors">
-                     <div className="flex items-center gap-3">
-                        <div className="p-2 bg-neutral-100 dark:bg-neutral-950 rounded-lg text-neutral-400 transition-colors"><Fingerprint size={18} /></div>
-                        <div>
-                           <p className="text-sm font-bold text-neutral-900 dark:text-white transition-colors">{t('settings.biometric')}</p>
-                           <p className="text-xs text-neutral-500">{t('settings.biometricDesc')}</p>
+                  <div className="p-4 flex flex-col gap-2 hover:bg-neutral-50 dark:hover:bg-neutral-800/30 transition-colors">
+                     <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                           <div className="p-2 bg-neutral-100 dark:bg-neutral-950 rounded-lg text-neutral-400 transition-colors"><Fingerprint size={18} /></div>
+                           <div>
+                              <p className="text-sm font-bold text-neutral-900 dark:text-white transition-colors">{t('settings.biometric')}</p>
+                              <p className="text-xs text-neutral-500">{t('settings.biometricDesc')}</p>
+                           </div>
                         </div>
+                        <button
+                           onClick={() => toggleBiometrics(!biometricsEnabled)}
+                           disabled={!window.PublicKeyCredential || !window.isSecureContext}
+                           className="disabled:opacity-30 disabled:cursor-not-allowed"
+                        >
+                           {biometricsEnabled ? (
+                              <ToggleRight size={32} className="text-gold-500" />
+                           ) : (
+                              <ToggleLeft size={32} className="text-neutral-400" />
+                           )}
+                        </button>
                      </div>
-                     <button onClick={() => toggleBiometrics(!biometricsEnabled)}>
-                        {biometricsEnabled ? (
-                           <ToggleRight size={32} className="text-gold-500" />
-                        ) : (
-                           <ToggleLeft size={32} className="text-neutral-400" />
-                        )}
-                     </button>
+                     {!window.isSecureContext && (
+                        <div className="ml-12 p-3 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-3 animate-fade-in">
+                           <Shield size={14} className="text-red-500 shrink-0" />
+                           <p className="text-[10px] text-red-500 font-bold uppercase tracking-wide">
+                              {currentLanguage === 'es' ? 'Se requiere conexión HTTPS segura' : 'Secure HTTPS Connection Required'}
+                           </p>
+                        </div>
+                     )}
+                     {window.isSecureContext && !window.PublicKeyCredential && (
+                        <div className="ml-12 p-3 bg-neutral-500/10 border border-neutral-500/20 rounded-xl flex items-center gap-3 animate-fade-in">
+                           <Monitor size={14} className="text-neutral-500 shrink-0" />
+                           <p className="text-[10px] text-neutral-500 font-bold uppercase tracking-wide">
+                              {currentLanguage === 'es' ? 'Hardware biométrico no detectado' : 'Biometric Hardware Not Detected'}
+                           </p>
+                        </div>
+                     )}
                   </div>
                   <button
                      onClick={() => {
