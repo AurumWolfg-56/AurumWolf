@@ -1,5 +1,0 @@
-
-> aurumwolf@0.0.0 typecheck
-> tsc --noEmit
-
-App.tsx(258,25): error TS2740: Type '{ netWorth: number; onNavigate: (tab: NavTab, payload?: any) => void; privacyMode: boolean; baseCurrency: string; t: (key: string) => any; language: Language; assetsByType: Record<...>; ... 6 more ...; healthBreakdown: { ...; }; }' is missing the following properties from type 'DashboardPageProps': transactions, accounts, budgets, investments, and 6 more.

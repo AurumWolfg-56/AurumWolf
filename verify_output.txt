@@ -1,3 +1,0 @@
-Testing Gemini Proxy at: https://uzdkptbflaelqvusxcha.supabase.co/functions/v1/gemini-proxy
-Status Code: 400
-Error body: {"error":"Missing GEMINI_API_KEY. Configure Supabase Secret or check .env.local fallback."}

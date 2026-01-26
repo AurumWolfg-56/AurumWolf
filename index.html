@@ -10,9 +10,9 @@
   <title>AurumWolf | Intelligent Wealth v1.0.1</title>
 
   <!-- PWA Configuration -->
-  <link rel="icon" type="image/png" href="/favicon.png?v=5" />
-  <link rel="alternate icon" href="/favicon.png?v=5" />
-  <link rel="apple-touch-icon" href="/icon-512.png?v=5" />
+  <link rel="icon" type="image/png" href="./favicon.png?v=5" />
+  <link rel="alternate icon" href="./favicon.png?v=5" />
+  <link rel="apple-touch-icon" href="./icon-512.png?v=5" />
   <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
   <meta name="theme-color" content="#F1F3F5" media="(prefers-color-scheme: light)" />
 
@@ -21,7 +21,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="AurumWolf" />
-  <link rel="apple-touch-icon" href="/icon-512.png" />
+  <link rel="apple-touch-icon" href="./icon-512.png" />
 
   <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -37,7 +37,6 @@
       /* Default to Dark Mode base */
       background-color: #0a0a0a;
       color: #e5e5e5;
-      transition: background-color 0.3s ease, color 0.3s ease;
       transition: background-color 0.3s ease, color 0.3s ease;
       /* Prevent rubber-banding on iOS PWA - Removed to fix scroll issue unless needed */
     }
@@ -114,15 +113,19 @@
       /* Pagination control */
       .page-break {
         page-break-before: always;
-        break-before: page;
+        -moz-column-break-before: page;
+             break-before: page;
       }
 
       .avoid-break {
         page-break-inside: avoid;
-        break-inside: avoid;
+        -moz-column-break-inside: avoid;
+             break-inside: avoid;
       }
     }
   </style>
+
+  <link rel="stylesheet" href="/index.css">
   <script type="importmap">
 {
   "imports": {
@@ -134,12 +137,12 @@
   }
 }
 </script>
-  <link rel="stylesheet" href="/index.css">
-</head>
+  <script type="module" crossorigin src="./assets/index-D-YB_Ajq.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-itOpP3Lt.css">
+<link rel="manifest" href="./manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="./registerSW.js"></script></head>
 
 <body>
-  <div id="root"></div>
-  <script type="module" src="./src/index.tsx"></script>
+  <div id="root"></div>
 </body>
 
 </html>
