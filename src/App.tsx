@@ -218,6 +218,11 @@ export default function App() {
             setShowTransactionForm(true);
         }
 
+        if (payload?.action === 'scanned' && payload.data) {
+            setScannedData(payload.data);
+            setShowTransactionForm(true);
+        }
+
         if (payload?.action === 'payRecurring' && payload.transactionId) {
             const original = transactions.find(t => t.id === payload.transactionId);
             if (original) {
@@ -311,7 +316,7 @@ export default function App() {
                     onEditTransaction={(tx) => { setEditingTransaction(tx); setShowTransactionForm(true); }}
                     onNewTransaction={() => { setEditingTransaction(null); setShowTransactionForm(true); }}
                     onDeleteTransaction={handleDeleteTransactionWrapper}
-                    onScan={() => handleNavigation('scan')}
+                    onScan={() => setActiveTab('scan')}
                     onStopRecurring={(id) => {
                         const tx = transactions.find(t => t.id === id);
                         if (tx) {

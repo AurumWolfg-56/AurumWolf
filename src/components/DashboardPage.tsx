@@ -380,7 +380,17 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                         setIsScannerOpen(false);
                         // Trigger the parent's logic to open transaction form with scanned data
                         if (onNavigate) {
-                            onNavigate('transactions', { action: 'scanned', data });
+                            // Map scanned data to match Transaction partial structure
+                            const mappedData = {
+                                amount: new Intl.NumberFormat('en-US', { style: 'currency', currency: data.currency || baseCurrency }).format(data.amount || 0),
+                                numericAmount: data.amount || 0,
+                                currency: data.currency || baseCurrency,
+                                name: data.merchant,
+                                date: data.date,
+                                category: data.category,
+                                description: data.description
+                            };
+                            onNavigate('transactions', { action: 'scanned', data: mappedData });
                         }
                     }}
                 />
