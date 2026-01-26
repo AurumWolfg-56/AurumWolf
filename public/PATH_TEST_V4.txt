@@ -1,0 +1,3 @@
+Path Test V4
+If you see this in /domains/aurumwolf.com/public_html/, we found the right path!
+Timestamp: 2026-01-25 23:35
