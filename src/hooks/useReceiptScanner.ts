@@ -41,23 +41,33 @@ export const useReceiptScanner = ({ apiKey, onScanComplete }: UseReceiptScannerP
                         parts: [
                             { inlineData: { mimeType: 'image/jpeg', data: resizedBase64 } },
                             {
-                                text: `Analyze this receipt image. Extract data into this exact JSON structure:
-                                {
-                                  "amount": number (no currency symbols),
-                                  "currency": "ISO_CODE" (e.g. USD, MXN),
-                                  "merchant": "Merchant Name",
-                                  "date": "YYYY-MM-DD",
-                                  "category": "Best Match",
-                                  "description": "Short summary of items"
-                                }
-                                Use these categories: ${CATEGORIES.map(c => c.category).join(', ')}.
-                                If a field is missing, omit it or use null.`
+                                text: `Analyze this receipt image. Extract the followings details:
+                                - Total Amount (number only)
+                                - Currency Code (ISO format like USD, MXN)
+                                - Merchant Name
+                                - Date (YYYY-MM-DD)
+                                - Category (Choose best from: ${CATEGORIES.map(c => c.category).join(', ')})
+                                - Description (Brief summary of items)
+                                
+                                If a field is not visible, leave it null.`
                             }
                         ]
                     }
                 ],
                 {
-                    responseMimeType: "application/json"
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: "OBJECT",
+                        properties: {
+                            amount: { type: "NUMBER", description: "Total transaction amount" },
+                            currency: { type: "STRING", description: "ISO 4217 currency code" },
+                            merchant: { type: "STRING", description: "Name of the merchant or business" },
+                            date: { type: "STRING", description: "Transaction date in YYYY-MM-DD format" },
+                            category: { type: "STRING", description: "Best matching category" },
+                            description: { type: "STRING", description: "Short description of purchased items" }
+                        },
+                        required: ["amount", "merchant", "date", "currency"]
+                    }
                 }
             );
 
