@@ -3,6 +3,8 @@ import React, { useState, useRef } from 'react';
 import { Camera, Upload, Loader2, CheckCircle2, AlertCircle, X, ShieldCheck } from 'lucide-react';
 import { useReceiptScanner, ScannedReceiptData } from '../../hooks/useReceiptScanner';
 
+import { useSecurity } from '../../contexts/SecurityContext';
+
 interface DocumentScannerProps {
     onClose: () => void;
     onSave: (data: ScannedReceiptData) => void;
@@ -12,6 +14,7 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onClose, onSav
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [preview, setPreview] = useState<string | null>(null);
     const [scannedData, setScannedData] = useState<ScannedReceiptData | null>(null);
+    const { setSecurityBypass } = useSecurity();
 
     const { isScanning, scanReceipt, error } = useReceiptScanner({
         onScanComplete: (data) => {
@@ -22,10 +25,23 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onClose, onSav
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
+            setSecurityBypass(false); // Reset bypass once file is selected
             const reader = new FileReader();
             reader.onloadend = () => setPreview(reader.result as string);
             reader.readAsDataURL(file);
             scanReceipt(file);
+        }
+    };
+
+    const triggerScanner = (useCamera: boolean) => {
+        if (fileInputRef.current) {
+            setSecurityBypass(true); // Bypass lock before opening camera/picker
+            if (useCamera) {
+                fileInputRef.current.setAttribute('capture', 'environment');
+            } else {
+                fileInputRef.current.removeAttribute('capture');
+            }
+            fileInputRef.current.click();
         }
     };
 
@@ -38,6 +54,11 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onClose, onSav
             reader.readAsDataURL(file);
             scanReceipt(file);
         }
+    };
+
+    const handleClose = () => {
+        setSecurityBypass(false);
+        onClose();
     };
 
     return (
@@ -54,7 +75,7 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onClose, onSav
                             <p className="text-xs text-white/40 uppercase tracking-widest font-medium">AI-Powered Data Extraction</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-full transition-colors">
+                    <button onClick={handleClose} className="p-2 hover:bg-white/5 rounded-full transition-colors">
                         <X className="w-5 h-5 text-white/40" />
                     </button>
                 </div>
@@ -64,28 +85,44 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onClose, onSav
                         <div
                             onDragOver={(e) => e.preventDefault()}
                             onDrop={handleDrop}
-                            onClick={() => fileInputRef.current?.click()}
-                            className="group border-2 border-dashed border-white/10 rounded-2xl p-12 flex flex-col items-center justify-center gap-4 hover:border-[#d4af37]/50 hover:bg-[#d4af37]/5 transition-all cursor-pointer"
+                            className="group border-2 border-dashed border-white/10 rounded-2xl p-8 md:p-12 flex flex-col items-center justify-center gap-6 hover:border-[#d4af37]/50 hover:bg-[#d4af37]/5 transition-all text-center"
                         >
                             <input
                                 type="file"
                                 ref={fileInputRef}
                                 onChange={handleFileSelect}
                                 className="hidden"
-                                accept="image/*"
-                                capture="environment"
+                                accept="image/*,application/pdf"
                             />
-                            <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                <Upload className="w-8 h-8 text-white/20 group-hover:text-[#d4af37]" />
+
+                            <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <Upload className="w-10 h-10 text-white/20 group-hover:text-[#d4af37]" />
                             </div>
-                            <div className="text-center">
-                                <p className="text-lg font-medium text-white mb-1">Upload or Capture</p>
-                                <p className="text-sm text-white/40">Drop your document here or click to scan</p>
+
+                            <div className="space-y-2">
+                                <p className="text-xl font-medium text-white">Capture Receipt</p>
+                                <p className="text-sm text-white/40 max-w-xs mx-auto">Upload an image or use your camera to extract financial details instantly.</p>
                             </div>
-                            <div className="mt-4 flex gap-2">
+
+                            <div className="flex flex-col sm:flex-row gap-4 w-full max-w-sm">
+                                <button
+                                    onClick={() => triggerScanner(true)}
+                                    className="flex-1 flex items-center justify-center gap-2 bg-[#d4af37] text-black font-bold py-3 rounded-xl hover:bg-[#c4a030] transition-all"
+                                >
+                                    <Camera size={18} /> Open Camera
+                                </button>
+                                <button
+                                    onClick={() => triggerScanner(false)}
+                                    className="flex-1 flex items-center justify-center gap-2 bg-white/10 text-white font-bold py-3 rounded-xl hover:bg-white/20 transition-all border border-white/10"
+                                >
+                                    <Upload size={18} /> Upload Image
+                                </button>
+                            </div>
+
+                            <div className="flex gap-2">
                                 <span className="px-3 py-1 rounded-full bg-white/5 text-[10px] text-white/40 border border-white/10">JPG</span>
                                 <span className="px-3 py-1 rounded-full bg-white/5 text-[10px] text-white/40 border border-white/10">PNG</span>
-                                <span className="px-3 py-1 rounded-full bg-white/5 text-[10px] text-white/40 border border-white/10">WEBP</span>
+                                <span className="px-3 py-1 rounded-full bg-white/5 text-[10px] text-white/40 border border-white/10">PDF</span>
                             </div>
                         </div>
                     ) : (

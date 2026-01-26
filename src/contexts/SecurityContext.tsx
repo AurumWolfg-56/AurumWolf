@@ -13,6 +13,8 @@ interface SecurityContextType {
     removePin: () => void;
     verifyBiometrics: () => Promise<boolean>;
     lastBiometricError: string | null;
+    isSecurityBypassed: boolean;
+    setSecurityBypass: (enabled: boolean) => void;
 }
 
 const SecurityContext = createContext<SecurityContextType | undefined>(undefined);
@@ -34,6 +36,20 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     const [hasPin, setHasPin] = useState(() => !!localStorage.getItem(STORAGE_KEYS.PIN_HASH));
     const [biometricsEnabled, setBiometricsEnabled] = useState(() => localStorage.getItem(STORAGE_KEYS.BIOMETRICS_ENABLED) === 'true');
     const [lastBiometricError, setLastBiometricError] = useState<string | null>(null);
+    const [isSecurityBypassed, setIsSecurityBypassed] = useState(false);
+
+    // Auto-reset bypass after 60 seconds of inactivity to prevent permanent vulnerability
+    const bypassTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+
+    const setSecurityBypass = (enabled: boolean) => {
+        setIsSecurityBypassed(enabled);
+        if (bypassTimeoutRef.current) clearTimeout(bypassTimeoutRef.current);
+        if (enabled) {
+            bypassTimeoutRef.current = setTimeout(() => {
+                setIsSecurityBypassed(false);
+            }, 60000); // 60s max bypass
+        }
+    };
 
     // Helper: Hash PIN using SHA-256
     const hashPin = async (pin: string): Promise<string> => {
@@ -197,12 +213,17 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         if (!hasPin) return;
 
         const enforceLock = () => {
+            if (isSecurityBypassed) {
+                console.log("Security: Lock bypassed for active operation");
+                return;
+            }
             console.log("Security Event: Locking app");
             lock();
             localStorage.setItem('aurum_last_active', Date.now().toString());
         };
 
         const reEntryCheck = () => {
+            if (isSecurityBypassed) return;
             const now = Date.now();
             const lastActive = parseInt(localStorage.getItem('aurum_last_active') || '0');
 
@@ -254,7 +275,9 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             toggleBiometrics,
             removePin,
             verifyBiometrics,
-            lastBiometricError
+            lastBiometricError,
+            isSecurityBypassed,
+            setSecurityBypass
         }}>
             {children}
         </SecurityContext.Provider>
