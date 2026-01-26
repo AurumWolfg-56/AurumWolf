@@ -4,7 +4,7 @@
 
 @layer base {
   body {
-    @apply antialiased transition-colors duration-300;
+    @apply antialiased transition-colors duration-300 aurora-bg text-white;
   }
 
   .pt-safe {
@@ -34,16 +34,26 @@
 
   /* Premium Glassmorphism */
   .glass {
-    @apply bg-white/80 dark:bg-zinc-950/70 backdrop-blur-xl border-b border-white/10 shadow-sm;
+    @apply bg-white/10 dark:bg-neutral-900/40 backdrop-blur-xl border border-white/10 shadow-glass;
   }
 
   /* Glass Card - Subtle for lists */
   .glass-card {
-    @apply bg-white dark:bg-neutral-900 border border-neutral-100 dark:border-neutral-800 shadow-sm transition-all duration-300;
+    @apply bg-white/50 dark:bg-neutral-800/50 backdrop-blur-md border border-neutral-200/50 dark:border-neutral-700/50 shadow-sm transition-all duration-300 hover:shadow-glow hover:border-gold-500/30;
+  }
+
+  /* Aurora Background */
+  .aurora-bg {
+    @apply relative overflow-hidden bg-neutral-950;
+  }
+
+  .aurora-bg::before {
+    content: '';
+    @apply absolute top-[-50%] left-[-50%] w-[200%] h-[200%] animate-aurora-spin bg-aurora opacity-20 blur-[120px] pointer-events-none;
   }
 
   /* Text Gradients */
   .text-gradient-gold {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-yellow-300 to-yellow-600;
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-gold-300 via-gold-500 to-gold-200;
   }
 }

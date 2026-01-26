@@ -170,7 +170,8 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
   };
 
   const handleScanConfirm = (data: ScannedReceiptData) => {
-    if (data.amount !== undefined) setAmount(data.amount.toString());
+    // V3 Scanner returns null for missing fields, so we check != null (covers null and undefined)
+    if (data.amount != null) setAmount(data.amount.toString());
     if (data.merchant) setMerchant(data.merchant);
     if (data.date) setDate(data.date);
     if (data.category && categories.some(c => c.category === data.category)) setCategory(data.category);
