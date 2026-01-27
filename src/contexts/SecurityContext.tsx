@@ -43,14 +43,17 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     const bypassTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
     const setSecurityBypass = (enabled: boolean) => {
-        setIsSecurityBypassed(enabled);
+        // CRITICAL: Set ref FIRST (synchronous) before async state update
         bypassRef.current = enabled;
+        setIsSecurityBypassed(enabled);
+
         if (bypassTimeoutRef.current) clearTimeout(bypassTimeoutRef.current);
         if (enabled) {
+            // 60s max bypass for safety
             bypassTimeoutRef.current = setTimeout(() => {
-                setIsSecurityBypassed(false);
                 bypassRef.current = false;
-            }, 60000); // 60s max bypass
+                setIsSecurityBypassed(false);
+            }, 60000);
         }
     };
 
@@ -151,8 +154,8 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             console.error("Biometrics: Verification failed", error);
             setLastBiometricError(error.name === 'NotAllowedError' ? 'Canceled' : 'Hardware Error');
         } finally {
-            // Delay reset slightly to ensure the window has regained focus
-            setTimeout(() => setSecurityBypass(false), 1000);
+            // Longer delay to ensure window regains focus and avoid flicker
+            setTimeout(() => setSecurityBypass(false), 3000);
         }
         return false;
     };
@@ -208,7 +211,8 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 alert(`No se pudo activar: ${msg}`);
                 setLastBiometricError(e.message);
             } finally {
-                setTimeout(() => setSecurityBypass(false), 1000);
+                // Longer delay to prevent flicker during enrollment
+                setTimeout(() => setSecurityBypass(false), 3000);
             }
         } else {
             setBiometricsEnabled(false);
@@ -235,8 +239,9 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         if (!hasPin) return;
 
         const enforceLock = () => {
-            if (bypassRef.current) {
-                console.log("Security: Lock bypassed for active operation (ref check)");
+            // Double-check bypass synchronously - critical for preventing flicker
+            if (bypassRef.current === true) {
+                console.log("Security: Lock bypassed for active operation");
                 return;
             }
             console.log("Security Event: Locking app");

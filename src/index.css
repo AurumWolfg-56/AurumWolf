@@ -81,5 +81,19 @@
 
   .animate-scan {
     animation: scan 2s ease-in-out infinite;
+    will-change: top, opacity;
+  }
+
+  /* Anti-flicker utility - forces GPU acceleration */
+  .no-flicker {
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+
+  /* Scanner container stability */
+  .scanner-container {
+    transform: translateZ(0);
+    will-change: auto;
   }
 }

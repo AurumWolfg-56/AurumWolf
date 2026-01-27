@@ -1,5 +1,5 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback, useMemo } from 'react';
 import { Camera, Upload, Loader2, CheckCircle2, AlertCircle, X, ShieldCheck, ArrowRight } from 'lucide-react';
 import { useReceiptScanner, ScannedReceiptData } from '../../hooks/useReceiptScanner';
 import { useSecurity } from '../../contexts/SecurityContext';
@@ -9,42 +9,70 @@ interface DocumentScannerProps {
     onSave: (data: ScannedReceiptData) => void;
 }
 
+// Memoized Field component to prevent re-renders
+const Field = React.memo(({ label, value }: { label: string, value: string }) => (
+    <div className="p-3 rounded-xl bg-white/[0.03] border border-white/5">
+        <p className="text-[10px] text-white/40 uppercase tracking-widest mb-1 font-bold">{label}</p>
+        <p className="text-base text-white font-medium">{value}</p>
+    </div>
+));
+
+Field.displayName = 'Field';
+
 export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onClose, onSave }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [preview, setPreview] = useState<string | null>(null);
     const [scannedData, setScannedData] = useState<ScannedReceiptData | null>(null);
     const { setSecurityBypass } = useSecurity();
 
+    // Track if we initiated file selection to prevent flicker
+    const isSelectingFileRef = useRef(false);
+
+    const handleScanComplete = useCallback((data: ScannedReceiptData) => {
+        setScannedData(data);
+    }, []);
+
     const { isScanning, scanReceipt, error } = useReceiptScanner({
-        onScanComplete: (data) => {
-            setScannedData(data);
-        }
+        onScanComplete: handleScanComplete
     });
 
-    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
-            setSecurityBypass(false);
+            isSelectingFileRef.current = false;
             const reader = new FileReader();
             reader.onloadend = () => setPreview(reader.result as string);
             reader.readAsDataURL(file);
             scanReceipt(file);
+        } else {
+            // User cancelled file selection - reset bypass after delay
+            setTimeout(() => {
+                isSelectingFileRef.current = false;
+                setSecurityBypass(false);
+            }, 500);
         }
-    };
+    }, [scanReceipt, setSecurityBypass]);
 
-    const triggerScanner = (useCamera: boolean) => {
+    const triggerScanner = useCallback((useCamera: boolean) => {
         if (fileInputRef.current) {
+            // Set bypass BEFORE triggering file dialog
+            isSelectingFileRef.current = true;
             setSecurityBypass(true);
+
             if (useCamera) {
                 fileInputRef.current.setAttribute('capture', 'environment');
             } else {
                 fileInputRef.current.removeAttribute('capture');
             }
-            fileInputRef.current.click();
-        }
-    };
 
-    const handleDrop = (e: React.DragEvent) => {
+            // Small delay to ensure bypass is set before focus leaves
+            requestAnimationFrame(() => {
+                fileInputRef.current?.click();
+            });
+        }
+    }, [setSecurityBypass]);
+
+    const handleDrop = useCallback((e: React.DragEvent) => {
         e.preventDefault();
         const file = e.dataTransfer.files?.[0];
         if (file) {
@@ -53,15 +81,71 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onClose, onSav
             reader.readAsDataURL(file);
             scanReceipt(file);
         }
-    };
+    }, [scanReceipt]);
 
-    const handleClose = () => {
+    const handleClose = useCallback(() => {
         setSecurityBypass(false);
         onClose();
-    };
+    }, [setSecurityBypass, onClose]);
+
+    const handleReset = useCallback(() => {
+        setPreview(null);
+        setScannedData(null);
+    }, []);
+
+    const handleConfirm = useCallback(() => {
+        if (scannedData) {
+            onSave(scannedData);
+        }
+    }, [scannedData, onSave]);
+
+    // Memoize results section to prevent unnecessary re-renders
+    const ResultsSection = useMemo(() => {
+        if (error) {
+            return (
+                <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex gap-3 items-start">
+                    <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                    <p className="text-sm text-red-200/80">{error}</p>
+                </div>
+            );
+        }
+
+        if (scannedData) {
+            return (
+                <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                        <Field label="Amount" value={scannedData.amount ? `$${scannedData.amount.toLocaleString()}` : '—'} />
+                        <Field label="Date" value={scannedData.date || '—'} />
+                    </div>
+                    <Field label="Merchant" value={scannedData.merchant || '—'} />
+                    <Field label="Category" value={scannedData.category || '—'} />
+
+                    <div className="pt-2">
+                        <div className="flex items-center gap-2 text-[9px] text-[#d4af37] mb-3 font-bold uppercase tracking-[0.2em]">
+                            <CheckCircle2 className="w-3 h-3" />
+                            Securely Verified
+                        </div>
+                        <button
+                            onClick={handleConfirm}
+                            className="w-full py-4 bg-[#d4af37] text-black font-bold rounded-xl hover:bg-[#c4a030] transition-all transform active:scale-95 shadow-lg shadow-[#d4af37]/20 flex items-center justify-center gap-2"
+                        >
+                            Confirm Transaction <ArrowRight size={18} />
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        return (
+            <div className="flex flex-col items-center justify-center py-12 border border-dashed border-white/5 rounded-xl bg-white/[0.01]">
+                <Loader2 className="w-6 h-6 text-white/10 animate-spin mb-3" />
+                <p className="text-[10px] text-white/20 uppercase tracking-[0.1em]">Awaiting Data...</p>
+            </div>
+        );
+    }, [error, scannedData, handleConfirm]);
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm scanner-container">
             <div className="bg-[#0a0a0a] border border-[#d4af37]/20 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl shadow-[#d4af37]/5">
                 {/* Header */}
                 <div className="p-6 border-b border-white/5 flex items-center justify-between bg-gradient-to-r from-[#d4af37]/10 to-transparent">
@@ -124,13 +208,18 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onClose, onSav
                             </div>
                         </div>
                     ) : (
-                        <div className="flex flex-col lg:grid lg:grid-cols-2 gap-6 md:gap-8 animate-in slide-in-from-bottom-4 duration-500">
-                            {/* Preview */}
+                        <div className="flex flex-col lg:grid lg:grid-cols-2 gap-6 md:gap-8">
+                            {/* Preview - stable key prevents remounting */}
                             <div className="space-y-4">
-                                <div className="aspect-video lg:aspect-[3/4] rounded-xl overflow-hidden border border-white/10 bg-black relative group shadow-inner">
-                                    <img src={preview} alt="Scan Preview" className="w-full h-full object-cover" />
+                                <div className="aspect-video lg:aspect-[3/4] rounded-xl overflow-hidden border border-white/10 bg-black relative group shadow-inner no-flicker">
+                                    <img
+                                        key="preview-image"
+                                        src={preview}
+                                        alt="Scan Preview"
+                                        className="w-full h-full object-cover"
+                                    />
                                     {isScanning && (
-                                        <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] flex items-center justify-center overflow-hidden">
+                                        <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] flex items-center justify-center overflow-hidden no-flicker">
                                             <div className="w-full h-1 bg-[#d4af37] absolute top-0 shadow-[0_0_20px_#d4af37] animate-scan" />
                                             <div className="flex flex-col items-center gap-3">
                                                 <Loader2 className="w-8 h-8 text-[#d4af37] animate-spin" />
@@ -140,7 +229,7 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onClose, onSav
                                     )}
                                 </div>
                                 <button
-                                    onClick={() => { setPreview(null); setScannedData(null); }}
+                                    onClick={handleReset}
                                     className="w-full py-2 text-[10px] uppercase tracking-widest font-bold text-white/40 hover:text-[#d4af37] transition-colors"
                                 >
                                     Change Source
@@ -153,40 +242,7 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onClose, onSav
                                     <ShieldCheck className="w-4 h-4 text-[#d4af37]" />
                                     <h3 className="text-xs font-bold text-white/80 uppercase tracking-widest">Analysis Results</h3>
                                 </div>
-
-                                {error ? (
-                                    <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex gap-3 items-start">
-                                        <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
-                                        <p className="text-sm text-red-200/80">{error}</p>
-                                    </div>
-                                ) : scannedData ? (
-                                    <div className="space-y-3 animate-in fade-in duration-500">
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <Field label="Amount" value={scannedData.amount ? `$${scannedData.amount.toLocaleString()}` : '—'} />
-                                            <Field label="Date" value={scannedData.date || '—'} />
-                                        </div>
-                                        <Field label="Merchant" value={scannedData.merchant || '—'} />
-                                        <Field label="Category" value={scannedData.category || '—'} />
-
-                                        <div className="pt-2">
-                                            <div className="flex items-center gap-2 text-[9px] text-[#d4af37] mb-3 font-bold uppercase tracking-[0.2em]">
-                                                <CheckCircle2 className="w-3 h-3" />
-                                                Securely Verified
-                                            </div>
-                                            <button
-                                                onClick={() => onSave(scannedData)}
-                                                className="w-full py-4 bg-[#d4af37] text-black font-bold rounded-xl hover:bg-[#c4a030] transition-all transform active:scale-95 shadow-lg shadow-[#d4af37]/20 flex items-center justify-center gap-2"
-                                            >
-                                                Confirm Transaction <ArrowRight size={18} />
-                                            </button>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="flex flex-col items-center justify-center py-12 border border-dashed border-white/5 rounded-xl bg-white/[0.01]">
-                                        <Loader2 className="w-6 h-6 text-white/10 animate-spin mb-3" />
-                                        <p className="text-[10px] text-white/20 uppercase tracking-[0.1em]">Awaiting Data...</p>
-                                    </div>
-                                )}
+                                {ResultsSection}
                             </div>
                         </div>
                     )}
@@ -199,10 +255,3 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onClose, onSav
         </div>
     );
 };
-
-const Field = ({ label, value }: { label: string, value: string }) => (
-    <div className="p-3 rounded-xl bg-white/[0.03] border border-white/5">
-        <p className="text-[10px] text-white/40 uppercase tracking-widest mb-1 font-bold">{label}</p>
-        <p className="text-base text-white font-medium">{value}</p>
-    </div>
-);
