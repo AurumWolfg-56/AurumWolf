@@ -15,6 +15,8 @@ interface BudgetFormProps {
   onSave: (budget: BudgetCategory) => void;
   onDelete?: (id: string) => void;
   onCancel: () => void;
+  /** Optional: Handler to open category creator from within budget mode */
+  onOpenCategoryCreator?: () => void;
 }
 
 // Map from ICON_MAP to the format expected by the UI (id + icon component)
@@ -30,7 +32,7 @@ const COLORS = [
   'bg-violet-600', 'bg-sky-500', 'bg-lime-500', 'bg-fuchsia-500'
 ];
 
-export const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, mode, onSave, onDelete, onCancel }) => {
+export const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, mode, onSave, onDelete, onCancel, onOpenCategoryCreator }) => {
   const { categories, totalProjectedIncome } = useCategories();
   const [category, setCategory] = useState('');
   const [limit, setLimit] = useState('');
@@ -149,6 +151,7 @@ export const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, mode, onSav
                   value={category}
                   onChange={handleCategoryChange}
                   placeholder="Select Category..."
+                  onCreateNew={onOpenCategoryCreator}
                 />
               </div>
 

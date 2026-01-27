@@ -292,6 +292,12 @@ export const BudgetPage: React.FC<BudgetPageProps> = ({
                         onSave={handleSaveBudget}
                         onDelete={handleDeleteBudgetHandler}
                         onCancel={() => setActiveBudgetModal(null)}
+                        onOpenCategoryCreator={
+                            // When in budget mode, clicking "Create New Category" opens category creation mode
+                            activeBudgetModal.mode === 'budget'
+                                ? () => setActiveBudgetModal({ mode: 'category', data: 'new' })
+                                : undefined
+                        }
                     />
                 )
             }

@@ -10,9 +10,21 @@ interface CategorySelectProps {
     type?: 'income' | 'expense';
     placeholder?: string;
     compact?: boolean;
+    /** Optional: External handler for creating new category. 
+     * When provided, clicking "Create New Category" will call this instead of opening the internal modal.
+     * This allows parent components to use their own category creation UI (e.g., BudgetForm in mode='category').
+     */
+    onCreateNew?: () => void;
 }
 
-export const CategorySelect: React.FC<CategorySelectProps> = ({ value, onChange, type, placeholder = "Select Category...", compact = false }) => {
+export const CategorySelect: React.FC<CategorySelectProps> = ({
+    value,
+    onChange,
+    type,
+    placeholder = "Select Category...",
+    compact = false,
+    onCreateNew
+}) => {
     const { categories, loading } = useCategories();
     const [isOpen, setIsOpen] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -37,6 +49,17 @@ export const CategorySelect: React.FC<CategorySelectProps> = ({ value, onChange,
 
     const selectedCategory = categories.find(c => c.category === value);
     const SelectedIcon = selectedCategory ? getIconComponent(selectedCategory.icon_key) : Tag;
+
+    const handleCreateNewClick = () => {
+        setIsOpen(false);
+        if (onCreateNew) {
+            // Use external handler
+            onCreateNew();
+        } else {
+            // Fall back to internal modal
+            setIsModalOpen(true);
+        }
+    };
 
     return (
         <>
@@ -82,7 +105,7 @@ export const CategorySelect: React.FC<CategorySelectProps> = ({ value, onChange,
                             </div>
                             <button
                                 type="button"
-                                onClick={() => { setIsOpen(false); setIsModalOpen(true); }}
+                                onClick={handleCreateNewClick}
                                 className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-colors text-xs font-medium border border-emerald-500/20"
                             >
                                 <Plus size={12} />
@@ -132,15 +155,18 @@ export const CategorySelect: React.FC<CategorySelectProps> = ({ value, onChange,
                 )}
             </div>
 
-            <CreateCategoryModal
-                isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                onSuccess={(newCatName) => {
-                    onChange(newCatName); // Auto-select the new category
-                    setIsModalOpen(false);
-                }}
-                initialType={type}
-            />
+            {/* Only render internal modal if onCreateNew is not provided */}
+            {!onCreateNew && (
+                <CreateCategoryModal
+                    isOpen={isModalOpen}
+                    onClose={() => setIsModalOpen(false)}
+                    onSuccess={(newCatName) => {
+                        onChange(newCatName); // Auto-select the new category
+                        setIsModalOpen(false);
+                    }}
+                    initialType={type}
+                />
+            )}
         </>
     );
 };
