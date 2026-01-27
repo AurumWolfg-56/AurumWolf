@@ -1,0 +1,18 @@
+src/App.tsx(340,44): error TS2339: Property 'user_id' does not exist on type 'BudgetCategory'.
+src/App.tsx(457,33): error TS2339: Property 'id' does not exist on type 'Omit<BudgetCategory, "id" | "spent">'.
+src/App.tsx(457,37): error TS2339: Property 'spent' does not exist on type 'Omit<BudgetCategory, "id" | "spent">'.
+src/App.tsx(457,44): error TS2339: Property 'user_id' does not exist on type 'Omit<BudgetCategory, "id" | "spent">'.
+src/components/ReceiptReviewModal.tsx(168,72): error TS2339: Property 'name' does not exist on type 'BudgetCategory'.
+src/components/ReceiptReviewModal.tsx(169,161): error TS2339: Property 'name' does not exist on type 'BudgetCategory'.
+src/components/ReceiptReviewModal.tsx(175,46): error TS2339: Property 'name' does not exist on type 'BudgetCategory'.
+src/components/TransactionsPage.tsx(72,46): error TS2339: Property 'name' does not exist on type 'BudgetCategory'.
+src/constants.ts(1062,94): error TS2353: Object literal may only specify known properties, and 'icon' does not exist in type 'BudgetCategory'.
+src/constants.ts(1063,97): error TS2353: Object literal may only specify known properties, and 'icon' does not exist in type 'BudgetCategory'.
+src/constants.ts(1066,94): error TS2353: Object literal may only specify known properties, and 'icon' does not exist in type 'BudgetCategory'.
+src/constants.ts(1067,88): error TS2353: Object literal may only specify known properties, and 'icon' does not exist in type 'BudgetCategory'.
+src/constants.ts(1068,81): error TS2353: Object literal may only specify known properties, and 'icon' does not exist in type 'BudgetCategory'.
+src/constants.ts(1069,79): error TS2353: Object literal may only specify known properties, and 'icon' does not exist in type 'BudgetCategory'.
+src/constants.ts(1070,86): error TS2353: Object literal may only specify known properties, and 'icon' does not exist in type 'BudgetCategory'.
+src/contexts/BudgetsContext.tsx(119,34): error TS2339: Property 'icon' does not exist on type 'BudgetCategory'.
+src/contexts/BudgetsContext.tsx(132,17): error TS2353: Object literal may only specify known properties, and 'icon' does not exist in type 'BudgetCategory'.
+src/contexts/BudgetsContext.tsx(156,34): error TS2339: Property 'icon' does not exist on type 'BudgetCategory'.
