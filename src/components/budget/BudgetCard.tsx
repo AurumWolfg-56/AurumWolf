@@ -77,10 +77,15 @@ export const BudgetCard: React.FC<BudgetCardProps> = memo(({
                     onClick(item);
                 }
             }}
-            className={`bg-white dark:bg-neutral-900 border rounded-2xl p-5 transition-all group relative overflow-hidden flex flex-col justify-between min-h-[190px] shadow-sm dark:shadow-none ${isEditing
-                ? 'border-gold-500/50 bg-platinum-100 dark:bg-neutral-900/80 cursor-pointer hover:bg-white dark:hover:bg-neutral-800'
-                : 'border-platinum-200 dark:border-neutral-800 hover:border-platinum-300 dark:hover:border-neutral-700 cursor-pointer hover:shadow-md'
-                } ${isOverLimit && !isEditing ? 'bg-red-50 dark:bg-neutral-900 border-red-200 dark:border-neutral-800' : ''}`}
+            className={`rounded-2xl p-5 transition-all group relative overflow-hidden flex flex-col justify-between min-h-[190px] backdrop-blur-xl border
+                ${isEditing
+                    ? 'border-gold-500/50 bg-platinum-100/50 dark:bg-neutral-900/50 cursor-pointer hover:bg-white/80 dark:hover:bg-neutral-800/80 scale-95 opacity-80 hover:opacity-100'
+                    : 'cursor-pointer hover:shadow-2xl hover:-translate-y-1'
+                }
+                ${!isEditing && !isOverLimit && !isIncome ? 'bg-white/90 dark:bg-[#151515]/90 border-platinum-200 dark:border-white/5 hover:border-gold-500/30' : ''}
+                ${!isEditing && isIncome ? 'bg-emerald-50/50 dark:bg-emerald-950/10 border-emerald-200/50 dark:border-emerald-500/10 hover:border-emerald-500/30' : ''}
+                ${!isEditing && isOverLimit ? 'bg-red-50/90 dark:bg-red-950/20 border-red-200 dark:border-red-500/20 shadow-red-500/5' : ''}
+            `}
         >
             {isOverLimit && !isEditing && (
                 <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">

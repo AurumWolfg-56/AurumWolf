@@ -48,7 +48,7 @@ export const BudgetPage: React.FC<BudgetPageProps> = ({
 }) => {
     const { accounts } = useAccounts();
     const [isEditing, setIsEditing] = useState(false);
-    const [activeBudgetModal, setActiveBudgetModal] = useState<{ mode: 'budget' | 'category'; data: BudgetCategory | 'new' } | null>(null);
+    const [activeBudgetModal, setActiveBudgetModal] = useState<{ mode: 'budget' | 'category'; data: BudgetCategory | 'new'; returnToBudget?: boolean } | null>(null);
     const [activeGoalModal, setActiveGoalModal] = useState<SavingsGoal | 'new' | null>(null);
     const [detailModalItem, setDetailModalItem] = useState<BudgetCategory | null>(null); // New State
     const [depositGoalId, setDepositGoalId] = useState<string | null>(null);
@@ -69,6 +69,19 @@ export const BudgetPage: React.FC<BudgetPageProps> = ({
         if (activeBudgetModal?.data === 'new') {
             const cleanBudget = { ...b, spent: 0 };
             onAddBudget?.(cleanBudget);
+
+            // If we need to return to budget mode (e.g. after creating category)
+            if (activeBudgetModal.returnToBudget) {
+                // Determine the next step. If we just created a category, we presumably want to set a limit for it.
+                // Re-open in budget mode, initializing with this new category.
+                // NOTE: cleanBudget has limit=0, which is fine for "new budget".
+                setActiveBudgetModal({
+                    mode: 'budget',
+                    data: cleanBudget, // Pass the entire object so BudgetForm can pre-fill category
+                    returnToBudget: false
+                });
+                return; // Do NOT close the modal
+            }
         } else {
             // Preserve existing spent amount if updating
             onUpdateBudget(b);
@@ -295,7 +308,7 @@ export const BudgetPage: React.FC<BudgetPageProps> = ({
                         onOpenCategoryCreator={
                             // When in budget mode, clicking "Create New Category" opens category creation mode
                             activeBudgetModal.mode === 'budget'
-                                ? () => setActiveBudgetModal({ mode: 'category', data: 'new' })
+                                ? () => setActiveBudgetModal({ mode: 'category', data: 'new', returnToBudget: true })
                                 : undefined
                         }
                     />
