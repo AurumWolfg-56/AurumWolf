@@ -2,6 +2,8 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { BudgetCategory } from '../types';
 import { useAuth } from './AuthContext';
+import { parseSupabaseData } from '../lib/supabaseSafe';
+import { BudgetCategorySchema } from '../lib/validators';
 
 // Default categories removed for user-controlled setup
 
@@ -37,20 +39,9 @@ export const CategoryProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
             if (error) throw error;
 
-            // Define DB Structure interface
-            interface DBBudgetCategory {
-                id: string;
-                name: string;
-                limit_amount: number;
-                color: string;
-                icon_key: string;
-                type: string;
-                is_system: boolean;
-            }
-
             if (data) {
-                // Map DB fields to Frontend types
-                const formatted: BudgetCategory[] = data.map((item: DBBudgetCategory) => ({
+                // Map DB fields to Frontend types before validation
+                const candidates = data.map((item: any) => ({
                     id: item.id,
                     category: item.name,
                     limit: Number(item.limit_amount),
@@ -58,9 +49,13 @@ export const CategoryProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                     color: item.color,
                     icon_key: item.icon_key,
                     type: item.type as 'income' | 'expense',
-                    is_system: item.is_system
+                    is_system: item.is_system,
+                    user_id: user.id
                 }));
-                setCategories(formatted);
+
+                // Validate using Zod schema
+                const validCategories = parseSupabaseData(BudgetCategorySchema, candidates, []) as BudgetCategory[];
+                setCategories(validCategories);
             }
         } catch (err) {
             console.error('Error fetching categories:', err);

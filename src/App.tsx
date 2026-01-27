@@ -1,17 +1,19 @@
 
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback, Suspense, lazy } from 'react';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Layout } from './components/Layout';
-import { DashboardPage } from './components/DashboardPage';
-import { AccountsPage } from './components/AccountsPage';
-import { TransactionsPage } from './components/TransactionsPage';
-import { BudgetPage } from './components/BudgetPage';
-import { BusinessPage } from './components/BusinessPage';
+
+// Lazy-loaded pages for code splitting
+const DashboardPage = lazy(() => import('./components/DashboardPage').then(m => ({ default: m.DashboardPage })));
+const AccountsPage = lazy(() => import('./components/AccountsPage').then(m => ({ default: m.AccountsPage })));
+const TransactionsPage = lazy(() => import('./components/TransactionsPage').then(m => ({ default: m.TransactionsPage })));
+const BudgetPage = lazy(() => import('./components/BudgetPage').then(m => ({ default: m.BudgetPage })));
+const BusinessPage = lazy(() => import('./components/BusinessPage').then(m => ({ default: m.BusinessPage })));
 import { useBusiness } from './contexts/BusinessContext';
-import { InvestmentsPage } from './components/InvestmentsPage';
-import { ReportsPage } from './components/ReportsPage';
-import { SettingsPage } from './components/SettingsPage';
-import { ScanPage } from './components/ScanPage';
+const InvestmentsPage = lazy(() => import('./components/InvestmentsPage').then(m => ({ default: m.InvestmentsPage })));
+const ReportsPage = lazy(() => import('./components/ReportsPage').then(m => ({ default: m.ReportsPage })));
+const SettingsPage = lazy(() => import('./components/SettingsPage').then(m => ({ default: m.SettingsPage })));
+const ScanPage = lazy(() => import('./components/ScanPage').then(m => ({ default: m.ScanPage })));
 
 import { TransactionForm } from './components/TransactionForm';
 
@@ -483,7 +485,13 @@ export default function App() {
                     language={language}
                     isLoading={loading}
                 >
-                    {renderContent()}
+                    <Suspense fallback={
+                        <div className="min-h-[50vh] flex items-center justify-center">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gold-500"></div>
+                        </div>
+                    }>
+                        {renderContent()}
+                    </Suspense>
                 </Layout>
             )}
         </SecurityProvider>

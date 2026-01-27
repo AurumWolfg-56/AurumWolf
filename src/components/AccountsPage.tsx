@@ -4,7 +4,7 @@ import {
     Plus, CreditCard, Wallet, Bitcoin, MoreVertical,
     ArrowUpRight, ArrowDownRight, Copy, ShieldCheck, Eye, EyeOff,
     ChevronLeft, History, Send, Snowflake, Edit2, X, ArrowRight, Globe, ArrowDown, TrendingUp,
-    Briefcase
+    Briefcase, ArrowLeftRight
 } from 'lucide-react';
 import { Account, Transaction } from '../types';
 import { CURRENCIES } from '../constants';
@@ -15,178 +15,13 @@ import { useTransactions } from '../contexts/TransactionsContext';
 import { useBusiness } from '../contexts/BusinessContext';
 import { getLocalDateISO } from '../lib/dates';
 
-const BalanceChart: React.FC<{
-    currentBalance: number;
-    transactions: Transaction[];
-    currency: string;
-    accountId: string;
-    days?: number;
-}> = ({ currentBalance, transactions, currency, accountId, days = 30 }) => {
+// Extracted sub-components
+import { BalanceChart, CardVisual, TransferModal } from './accounts';
 
-    const chartData = useMemo(() => {
-        const dataPoints = [];
-        let runningBalance = currentBalance;
-        const now = new Date();
-        const txMap: Record<string, number> = {};
-        transactions
-            .filter(t => t.accountId === accountId)
-            .forEach(t => {
-                const dateKey = t.date;
-                const impact = t.type === 'credit' ? t.numericAmount : -t.numericAmount;
-                txMap[dateKey] = (txMap[dateKey] || 0) + impact;
-            });
+// Re-export for backwards compatibility
+export { CardVisual } from './accounts';
+export type { CardVisualProps } from './accounts';
 
-        for (let i = 0; i < days; i++) {
-            const date = new Date(now);
-            date.setDate(date.getDate() - i);
-            const dateStr = date.toISOString().split('T')[0];
-
-            dataPoints.push({
-                date: dateStr,
-                displayDate: date.toLocaleDateString('en-US', { day: 'numeric', month: 'short' }),
-                value: runningBalance
-            });
-
-            if (txMap[dateStr]) {
-                runningBalance -= txMap[dateStr];
-            }
-        }
-
-        return dataPoints.reverse();
-    }, [currentBalance, transactions, accountId, days]);
-
-    const minVal = Math.min(...chartData.map(d => d.value));
-    const maxVal = Math.max(...chartData.map(d => d.value));
-    const range = maxVal - minVal || 1;
-    const startBal = chartData[0]?.value || 0;
-    const endBal = chartData[chartData.length - 1]?.value || 0;
-    const isPositive = endBal >= startBal;
-
-    return (
-        <div className="w-full h-48 flex items-end gap-1 pt-8 relative group">
-            <div className="absolute inset-x-0 border-t border-dashed border-neutral-700 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none top-1/2"></div>
-
-            {chartData.map((d, i) => {
-                const heightPercent = ((d.value - minVal) / range) * 80 + 10;
-                return (
-                    <div key={d.date} className="flex-1 flex flex-col justify-end items-center relative group/bar h-full">
-                        <div
-                            className={`w-full min-w-[4px] rounded-t-sm transition-all duration-500 opacity-60 hover:opacity-100 ${isPositive ? 'bg-emerald-500' : 'bg-red-500'
-                                }`}
-                            style={{ height: `${heightPercent}%` }}
-                        ></div>
-                        <div className="absolute bottom-full mb-2 bg-neutral-900 border border-neutral-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-xl opacity-0 group-hover/bar:opacity-100 transition-opacity whitespace-nowrap z-10 pointer-events-none">
-                            {d.displayDate}: {formatCurrency(d.value, currency)}
-                        </div>
-                    </div>
-                );
-            })}
-        </div>
-    );
-};
-
-export interface CardVisualProps {
-    account: Account;
-    showBalances: boolean;
-    onClick: () => void;
-    variant?: 'small' | 'large';
-    t: (key: string) => string;
-    linkedBusinessName?: string;
-}
-
-export const CardVisual: React.FC<CardVisualProps> = ({ account, showBalances, onClick, variant = 'small', t, linkedBusinessName }) => {
-    const Icon = account.type === 'crypto' ? Bitcoin
-        : account.type === 'business' ? Briefcase
-            : account.type === 'credit' ? CreditCard
-                : Wallet;
-
-    const isCredit = account.type === 'credit';
-    const debt = Math.abs(account.balance);
-    const limit = account.creditDetails?.limit || 0;
-    const available = limit - debt;
-    const utilization = limit > 0 ? (debt / limit) * 100 : 0;
-
-    return (
-        <div
-            onClick={onClick}
-            className={`relative w-full ${variant === 'large' ? 'aspect-[2/1] md:aspect-[2.5/1]' : 'aspect-[1.586]'} rounded-2xl p-6 flex flex-col justify-between overflow-hidden shadow-2xl transition-all hover:scale-[1.01] cursor-pointer group ${account.color} border border-white/5`}
-        >
-            <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-white to-transparent"></div>
-
-            {account.isFrozen && (
-                <div className="absolute inset-0 bg-neutral-950/60 backdrop-blur-[2px] z-20 flex items-center justify-center border-4 border-blue-500/30">
-                    <div className="bg-neutral-900/80 p-3 rounded-full text-blue-400 border border-blue-500/50 shadow-[0_0_30px_rgba(59,130,246,0.5)]">
-                        <Snowflake size={32} />
-                    </div>
-                </div>
-            )}
-
-            <div className="relative z-10 flex justify-between items-start">
-                <div className="flex items-center gap-3">
-                    <div className="bg-white/10 backdrop-blur-md p-2 rounded-lg border border-white/10">
-                        <Icon size={20} className="text-white" />
-                    </div>
-                    {isCredit && (
-                        <div className="flex flex-col">
-                            <span className="text-white/60 text-[10px] font-bold uppercase tracking-widest">{t('common.available')}</span>
-                            <span className="text-white font-mono text-xs font-bold">
-                                {showBalances ? formatCurrency(available, account.currency) : '••••'}
-                            </span>
-                        </div>
-                    )}
-                    {account.type === 'business' && (
-                        <span className="bg-gold-500/20 text-gold-200 text-[10px] font-bold px-2 py-1 rounded border border-gold-500/30 uppercase tracking-wider">
-                            {t('nav.business')}
-                        </span>
-                    )}
-
-                    {linkedBusinessName && (
-                        <span className="bg-blue-500/20 text-blue-200 text-[10px] font-bold px-2 py-1 rounded border border-blue-500/30 uppercase tracking-wider flex items-center gap-1">
-                            {linkedBusinessName}
-                        </span>
-                    )}
-                </div>
-                <span className="text-white/60 font-mono text-xs tracking-widest uppercase">{account.institution}</span>
-            </div>
-
-            <div className="relative z-10">
-                <div className="text-white/80 text-xs uppercase tracking-wider mb-1 font-semibold flex items-center gap-2">
-                    {account.name}
-                    {isCredit && account.creditDetails && <span className="opacity-50"> • {t('accounts.dueDay')} {account.creditDetails.paymentDueDay}</span>}
-                    {account.type === 'business' && account.businessDetails?.entityType && <span className="opacity-50"> • {account.businessDetails.entityType}</span>}
-                </div>
-                <div className={`${variant === 'large' ? 'text-4xl' : 'text-2xl md:text-3xl'} font-mono font-bold text-white tracking-tight`}>
-                    {showBalances
-                        ? (isCredit && account.balance > 0 ? '-' : '') + formatCurrency(Math.abs(account.balance), account.currency)
-                        : '••••••••'}
-                </div>
-
-                {isCredit && limit > 0 && (
-                    <div className="mt-3 w-full bg-black/20 h-1.5 rounded-full overflow-hidden backdrop-blur-sm border border-white/10">
-                        <div
-                            className={`h-full rounded-full transition-all duration-1000 ${utilization > 80 ? 'bg-red-400' : utilization > 50 ? 'bg-yellow-400' : 'bg-emerald-400'}`}
-                            style={{ width: `${utilization}%` }}
-                        ></div>
-                    </div>
-                )}
-            </div>
-
-            <div className="relative z-10 flex justify-between items-end">
-                <div className="flex gap-2">
-                    <span className="text-white/40 text-[10px]">{account.currency} {t('common.account').toUpperCase()}</span>
-                    {isCredit && limit > 0 && (
-                        <span className={`text-[10px] font-bold ${utilization > 30 ? 'text-yellow-200' : 'text-white/60'}`}>
-                            {utilization.toFixed(0)}% {t('accounts.util')}
-                        </span>
-                    )}
-                </div>
-                <div className="font-mono text-white/80 text-sm tracking-widest">
-                    •••• {account.last4 || '0000'}
-                </div>
-            </div>
-        </div >
-    );
-};
 
 interface AccountsPageProps {
     onEditTransaction?: (tx: Transaction) => void;
@@ -577,7 +412,22 @@ export const AccountsPage: React.FC<AccountsPageProps> = ({
                     </div>
                 </div>
 
-                {isTransferOpen && renderTransferModal()}
+                {isTransferOpen && (
+                    <TransferModal
+                        accounts={accounts}
+                        transferFrom={transferFrom}
+                        transferTo={transferTo}
+                        transferAmount={transferAmount}
+                        transferDate={transferDate}
+                        onFromChange={setTransferFrom}
+                        onToChange={setTransferTo}
+                        onAmountChange={setTransferAmount}
+                        onDateChange={setTransferDate}
+                        onSubmit={handleExecuteTransfer}
+                        onClose={() => setIsTransferOpen(false)}
+                        t={t}
+                    />
+                )}
 
                 {isFormOpen && (
                     <AccountForm
@@ -606,7 +456,7 @@ export const AccountsPage: React.FC<AccountsPageProps> = ({
                 </div>
                 <div className="flex gap-2">
                     <button onClick={() => setIsTransferOpen(true)} className="px-4 py-2 rounded-xl bg-platinum-100 dark:bg-neutral-800 border border-platinum-200 dark:border-neutral-700 text-neutral-900 dark:text-white font-bold hover:bg-platinum-200 dark:hover:bg-neutral-700 transition-all flex items-center gap-2">
-                        <ArrowRightRightIcon /> {t('common.transfer')}
+                        <ArrowLeftRight size={16} /> {t('common.transfer')}
                     </button>
                     <button
                         onClick={() => { setIsEditingAccount(false); setIsFormOpen(true); }}
@@ -642,7 +492,22 @@ export const AccountsPage: React.FC<AccountsPageProps> = ({
                 </button>
             </div>
 
-            {isTransferOpen && renderTransferModal()}
+            {isTransferOpen && (
+                <TransferModal
+                    accounts={accounts}
+                    transferFrom={transferFrom}
+                    transferTo={transferTo}
+                    transferAmount={transferAmount}
+                    transferDate={transferDate}
+                    onFromChange={setTransferFrom}
+                    onToChange={setTransferTo}
+                    onAmountChange={setTransferAmount}
+                    onDateChange={setTransferDate}
+                    onSubmit={handleExecuteTransfer}
+                    onClose={() => setIsTransferOpen(false)}
+                    t={t}
+                />
+            )}
 
             {isFormOpen && (
                 <AccountForm
@@ -653,103 +518,4 @@ export const AccountsPage: React.FC<AccountsPageProps> = ({
             )}
         </div>
     );
-
-    function renderTransferModal() {
-        const sourceCurrency = accounts.find(a => a.id === transferFrom)?.currency || 'USD';
-
-        return (
-            <div className="fixed inset-0 z-[60] bg-neutral-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-                <div className="w-full max-w-md bg-white dark:bg-neutral-900 border border-platinum-200 dark:border-neutral-800 rounded-3xl p-6 shadow-2xl animate-fade-in relative">
-                    <button onClick={() => setIsTransferOpen(false)} className="absolute top-4 right-4 text-neutral-500 hover:text-neutral-900 dark:hover:text-white">
-                        <X size={20} />
-                    </button>
-
-                    <div className="flex items-center gap-2 mb-6">
-                        <div className="p-2 bg-gold-500/10 rounded-lg text-gold-500"><Send size={20} /></div>
-                        <h3 className="text-lg font-bold text-neutral-900 dark:text-white">{t('accounts.transferFunds')}</h3>
-                    </div>
-
-                    <form onSubmit={handleExecuteTransfer} className="space-y-4">
-                        {/* From Account */}
-                        <div>
-                            <label className="block text-xs font-bold text-neutral-500 mb-1.5 uppercase tracking-wider">{t('common.from')}</label>
-                            <div className="relative">
-                                <select
-                                    value={transferFrom}
-                                    onChange={(e) => setTransferFrom(e.target.value)}
-                                    className="w-full bg-platinum-50 dark:bg-neutral-950 border border-platinum-200 dark:border-neutral-800 text-neutral-900 dark:text-white text-sm rounded-xl p-3 outline-none focus:border-gold-500 appearance-none"
-                                >
-                                    <option value="">{t('accounts.selectSource')}</option>
-                                    {accounts.map(acc => (
-                                        <option key={acc.id} value={acc.id} disabled={acc.isFrozen}>{acc.name} ({acc.currency}) {acc.isFrozen ? `(${t('accounts.frozen')})` : ''}</option>
-                                    ))}
-                                </select>
-                                <ChevronLeft size={16} className="absolute right-3 top-3.5 -rotate-90 text-neutral-500 pointer-events-none" />
-                            </div>
-                        </div>
-
-                        <div className="flex justify-center -my-2 relative z-10">
-                            <div className="bg-white dark:bg-neutral-900 border border-platinum-200 dark:border-neutral-800 rounded-full p-1.5 text-gold-500">
-                                <ArrowDown size={16} />
-                            </div>
-                        </div>
-
-                        <div>
-                            <label className="block text-xs font-bold text-neutral-500 mb-1.5 uppercase tracking-wider">{t('common.to')}</label>
-                            <div className="relative">
-                                <select
-                                    value={transferTo}
-                                    onChange={(e) => setTransferTo(e.target.value)}
-                                    className="w-full bg-platinum-50 dark:bg-neutral-950 border border-platinum-200 dark:border-neutral-800 text-neutral-900 dark:text-white text-sm rounded-xl p-3 outline-none focus:border-gold-500 appearance-none"
-                                >
-                                    <option value="">{t('accounts.selectDest')}</option>
-                                    {accounts.filter(a => a.id !== transferFrom).map(acc => (
-                                        <option key={acc.id} value={acc.id} disabled={acc.isFrozen}>{acc.name} ({acc.currency}) {acc.isFrozen ? `(${t('accounts.frozen')})` : ''}</option>
-                                    ))}
-                                </select>
-                                <ChevronLeft size={16} className="absolute right-3 top-3.5 -rotate-90 text-neutral-500 pointer-events-none" />
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-xs font-bold text-neutral-500 mb-1.5 uppercase tracking-wider">{t('common.amount')}</label>
-                                <div className="relative">
-                                    <input
-                                        type="number"
-                                        value={transferAmount}
-                                        onChange={(e) => setTransferAmount(e.target.value)}
-                                        className="w-full bg-platinum-50 dark:bg-neutral-950 border border-platinum-200 dark:border-neutral-800 text-neutral-900 dark:text-white text-sm rounded-xl p-3 pl-8 outline-none focus:border-gold-500"
-                                        placeholder="0.00"
-                                    />
-                                    <span className="absolute left-3 top-3 text-neutral-500 text-xs font-bold">{CURRENCIES.find(c => c.code === sourceCurrency)?.symbol}</span>
-                                </div>
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-neutral-500 mb-1.5 uppercase tracking-wider">{t('common.date')}</label>
-                                <input
-                                    type="date"
-                                    value={transferDate}
-                                    onChange={(e) => setTransferDate(e.target.value)}
-                                    className="w-full bg-platinum-50 dark:bg-neutral-950 border border-platinum-200 dark:border-neutral-800 text-neutral-900 dark:text-white text-sm rounded-xl p-3 outline-none focus:border-gold-500 [&::-webkit-calendar-picker-indicator]:invert dark:[&::-webkit-calendar-picker-indicator]:invert-0"
-                                />
-                            </div>
-                        </div>
-
-                        <button
-                            type="submit"
-                            disabled={!transferFrom || !transferTo || !transferAmount}
-                            className="w-full py-4 rounded-xl bg-gold-500 text-neutral-950 font-bold hover:bg-gold-400 transition-all shadow-lg mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {t('common.transfer')}
-                        </button>
-                    </form>
-                </div>
-            </div>
-        );
-    }
 };
-
-const ArrowRightRightIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
-);
