@@ -234,7 +234,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         setIsAuthenticated(true);
     };
 
-    // --- CRITICAL: ULTRA-STRICT AUTO-LOCK ---
+    // --- CRITICAL: AUTO-LOCK WITH SCANNER PROTECTION ---
     useEffect(() => {
         if (!hasPin) return;
 
@@ -244,6 +244,13 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 console.log("Security: Lock bypassed for active operation");
                 return;
             }
+
+            // Also check for active scanner
+            if (document.querySelector('.scanner-container')) {
+                console.log("Security: Lock bypassed - scanner active");
+                return;
+            }
+
             console.log("Security Event: Locking app");
             lock();
             localStorage.setItem('aurum_last_active', Date.now().toString());
@@ -251,30 +258,35 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
 
         const reEntryCheck = () => {
             if (bypassRef.current) return;
+            // Also check for active scanner
+            if (document.querySelector('.scanner-container')) return;
+
             const now = Date.now();
             const lastActive = parseInt(localStorage.getItem('aurum_last_active') || '0');
 
             if (document.visibilityState === 'visible') {
-                if (lastActive > 0 && now - lastActive > 2000) {
+                if (lastActive > 0 && now - lastActive > 5000) { // Increased to 5s
                     enforceLock();
                 }
                 localStorage.setItem('aurum_last_active', now.toString());
             } else {
-                enforceLock();
+                // Only lock on visibility hidden if no active operations
+                if (!bypassRef.current && !document.querySelector('.scanner-container')) {
+                    enforceLock();
+                }
             }
         };
 
-        // Aggressive event coverage
+        // Less aggressive event coverage - removed blur for mobile compatibility
         document.addEventListener("visibilitychange", reEntryCheck);
         window.addEventListener("pagehide", enforceLock);
-        window.addEventListener("blur", enforceLock);
+        // Removed: window.addEventListener("blur", enforceLock); - causes flicker on mobile file picker
         window.addEventListener("beforeunload", enforceLock);
         window.addEventListener("focus", reEntryCheck);
 
         return () => {
             document.removeEventListener("visibilitychange", reEntryCheck);
             window.removeEventListener("pagehide", enforceLock);
-            window.removeEventListener("blur", enforceLock);
             window.removeEventListener("beforeunload", enforceLock);
             window.removeEventListener("focus", reEntryCheck);
         };
