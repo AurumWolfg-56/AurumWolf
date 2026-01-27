@@ -454,7 +454,7 @@ export default function App() {
                     notifications={notifications}
                     onClearNotifications={() => setNotifications([])}
                     onAddBudget={(b) => {
-                        const { id, spent, user_id, ...rest } = b;
+                        const rest = b; // Already Omit<BudgetCategory, "id" | "spent">
                         // Check if category already exists (UPSERT Logic)
                         const existing = categories.find(c => c.category === b.category);
                         if (existing) {

@@ -43,13 +43,16 @@ export interface Account {
 export interface BudgetCategory {
   id: string;
   category: string;
+  name?: string; // Alias for category (backward compat)
   limit: number;
   spent: number; // Calculated on frontend based on Transactions
   color: string;
   icon_key: string; // Lucide Icon name string
+  icon?: string; // Alias for icon_key (backward compat)
   type: 'income' | 'expense';
   currency?: string;
   is_system?: boolean;
+  user_id?: string; // For DB operations
 }
 
 export interface SavingsGoal {

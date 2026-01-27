@@ -1059,15 +1059,15 @@ export const ICON_MAP: Record<string, any> = {
 // --- INITIAL BUDGET CONFIG ---
 export const INITIAL_BUDGET_CONFIG: BudgetCategory[] = [
   // Income Targets
-  { id: 'inc_1', category: 'Salary / Wages', limit: 8000, spent: 0, color: 'bg-emerald-500', icon: 'wallet', type: 'income' },
-  { id: 'inc_2', category: 'Freelance / Contract', limit: 4000, spent: 0, color: 'bg-teal-500', icon: 'laptop', type: 'income' },
+  { id: 'inc_1', category: 'Salary / Wages', limit: 8000, spent: 0, color: 'bg-emerald-500', icon_key: 'wallet', type: 'income' },
+  { id: 'inc_2', category: 'Freelance / Contract', limit: 4000, spent: 0, color: 'bg-teal-500', icon_key: 'laptop', type: 'income' },
 
   // Expense Limits
-  { id: '1', category: 'Housing & Utilities', limit: 3500, spent: 0, color: 'bg-purple-500', icon: 'home', type: 'expense' },
-  { id: '2', category: 'Food & Dining', limit: 1200, spent: 0, color: 'bg-orange-500', icon: 'utensils', type: 'expense' },
-  { id: '3', category: 'Shopping', limit: 1000, spent: 0, color: 'bg-pink-500', icon: 'shoppingBag', type: 'expense' },
-  { id: '4', category: 'Travel', limit: 2000, spent: 0, color: 'bg-blue-500', icon: 'plane', type: 'expense' },
-  { id: '5', category: 'Entertainment', limit: 500, spent: 0, color: 'bg-green-500', icon: 'zap', type: 'expense' },
+  { id: '1', category: 'Housing & Utilities', limit: 3500, spent: 0, color: 'bg-purple-500', icon_key: 'home', type: 'expense' },
+  { id: '2', category: 'Food & Dining', limit: 1200, spent: 0, color: 'bg-orange-500', icon_key: 'utensils', type: 'expense' },
+  { id: '3', category: 'Shopping', limit: 1000, spent: 0, color: 'bg-pink-500', icon_key: 'shoppingBag', type: 'expense' },
+  { id: '4', category: 'Travel', limit: 2000, spent: 0, color: 'bg-blue-500', icon_key: 'plane', type: 'expense' },
+  { id: '5', category: 'Entertainment', limit: 500, spent: 0, color: 'bg-green-500', icon_key: 'zap', type: 'expense' },
 ];
 
 // --- INITIAL SAVINGS GOALS ---

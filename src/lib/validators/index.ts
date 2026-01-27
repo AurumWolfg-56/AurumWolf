@@ -50,11 +50,14 @@ export const AccountSchema = z.object({
 export const BudgetCategorySchema = z.object({
     id: uuid,
     category: z.string(),
+    name: z.string().optional(), // Alias for category
     limit: z.coerce.number().min(0),
     spent: z.coerce.number().nullable().default(0).transform(v => v || 0), // Required in Type
     color: z.string().nullable().default('bg-gray-500').transform(v => v || 'bg-gray-500'),
+    icon_key: z.string().optional(),
+    icon: z.string().optional(), // Alias for icon_key
     type: z.enum(['income', 'expense']).optional(),
-    // icon is skipped from Zod as it's often a Component or string name handled in UI
+    user_id: z.string().optional(),
 });
 
 export const SavingsGoalSchema = z.object({

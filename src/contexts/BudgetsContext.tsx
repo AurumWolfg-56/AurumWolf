@@ -129,7 +129,7 @@ export function BudgetsProvider({ children }: { children: React.ReactNode }) {
                 category: data.category,
                 limit: data.limit_amount,
                 color: data.color,
-                icon: data.icon,
+                icon_key: data.icon,
                 type: data.type,
                 spent: 0
             };
