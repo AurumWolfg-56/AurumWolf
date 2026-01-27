@@ -70,8 +70,14 @@ export const CreateCategoryModal: React.FC<CreateCategoryModalProps> = ({ isOpen
     const IconPreview = getIconComponent(selectedIcon);
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-            <div className="bg-[#1A1A1A] border border-white/10 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+        <div
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+            onClick={(e) => e.stopPropagation()}
+        >
+            <div
+                className="bg-[#1A1A1A] border border-white/10 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+            >
                 <div className="p-4 border-b border-white/10 flex justify-between items-center">
                     <h3 className="text-lg font-medium text-white">New Category</h3>
                     <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-full text-gray-400">
