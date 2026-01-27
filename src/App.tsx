@@ -338,9 +338,22 @@ export default function App() {
                     budgets={enrichedBudgets}
                     onUpdateBudget={updateCategory}
                     onAddBudget={(b) => {
-                        // Strip temporary ID and spent, ensure only required fields are passed
-                        const { id, spent, user_id, ...rest } = b;
-                        addCategory(rest);
+                        // Check if category already exists (UPSERT Logic)
+                        const existing = categories.find(c => c.category === b.category);
+                        if (existing) {
+                            // Update existing category with new limit/type/color/icon
+                            updateCategory({
+                                ...existing,
+                                limit: b.limit,
+                                type: b.type,
+                                color: b.color,
+                                icon_key: b.icon_key
+                            });
+                        } else {
+                            // Strip temporary ID and spent, ensure only required fields are passed
+                            const { id, spent, user_id, ...rest } = b;
+                            addCategory(rest);
+                        }
                     }}
                     onDeleteBudget={deleteCategory}
                     goals={goals}
