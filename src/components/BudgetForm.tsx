@@ -71,12 +71,28 @@ export const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, mode, onSav
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!category) return;
+
+    // [VALIDATION] Prevent Duplicates
+    if (mode === 'category' && !initialData) {
+      // Check if category name already exists (case-insensitive)
+      const duplicate = categories.find(
+        c => c.category.trim().toLowerCase() === category.trim().toLowerCase()
+      );
+
+      if (duplicate) {
+        // If duplicate exists, we should probably warn the user or just select it?
+        // For now, strict prevention.
+        alert(`Category "${duplicate.category}" already exists! Please select it from the list or choose a different name.`);
+        return;
+      }
+    }
+
     // In 'budget' mode, limit is required. In 'category' mode, it defaults to 0 if empty.
     if (mode === 'budget' && !limit && type !== 'income') return; // Enforce limit for expenses
 
     const newBudget: BudgetCategory = {
       id: initialData ? initialData.id : crypto.randomUUID(),
-      category,
+      category: category.trim(), // Ensure trimmed
       limit: limit ? parseFloat(limit) : 0,
       spent: initialData ? initialData.spent : 0,
       type,
