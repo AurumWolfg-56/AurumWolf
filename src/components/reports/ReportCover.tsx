@@ -67,10 +67,6 @@ export const ReportCover: React.FC<{ snapshot: ReportSnapshot; userProfile?: { n
                 </div>
             </div>
 
-            {/* Watermark Logo */}
-            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 opacity-[0.03] pointer-events-none">
-                <Logo iconSize="w-[600px] h-[600px]" showText={false} />
-            </div>
         </div>
     );
 };
