@@ -13,8 +13,7 @@
   <link rel="icon" type="image/png" href="/favicon.png?v=5" />
   <link rel="alternate icon" href="/favicon.png?v=5" />
   <link rel="apple-touch-icon" href="/icon-512.png?v=5" />
-  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
-  <meta name="theme-color" content="#F1F3F5" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#000000" />
 
   <!-- iOS Specific -->
   <meta name="mobile-web-app-capable" content="yes" />
@@ -35,19 +34,11 @@
   <style>
     html,
     body {
-      /* Default to Dark Mode base - PREVENTS FLASH */
+      /* FORCE DARK MODE BASE - PREVENTS FLASH */
       background-color: #000000;
       color: #e5e5e5;
       margin: 0;
       min-height: 100%;
-    }
-
-    /* Neon Silver Theme (Light Mode) */
-    html:not(.dark),
-    html:not(.dark) body {
-      background-color: #F1F3F5;
-      /* platinum-100 */
-      color: #212529;
     }
 
     /* Custom Scrollbar */
@@ -64,8 +55,8 @@
       border-radius: 3px;
     }
 
-    html:not(.dark) ::-webkit-scrollbar-thumb {
-      background: #CED4DA;
+    ::-webkit-scrollbar-thumb:hover {
+      background: #D4AF37;
     }
 
     ::-webkit-scrollbar-thumb:hover {
