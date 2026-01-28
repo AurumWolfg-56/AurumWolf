@@ -439,10 +439,19 @@ export default function App() {
     const shouldShowLoader = loading;
     const shouldShowLogin = !user && !loading;
 
+    // Internal Gate Component to handle Render Logic
+    const SecurityGate = ({ children }: { children: React.ReactNode }) => {
+        const { isLocked } = useSecurity();
+        // If locked, render the Lock Screen exclusively (no background app)
+        if (isLocked) {
+            return <AppLock />;
+        }
+        return <>{children}</>;
+    };
+
     return (
         <SecurityProvider>
-            {/* App Lock should be active globally if enabled */}
-            <AppLock />
+            {/* Privacy Shield remains for OS-level protection */}
             <PrivacyShield />
 
             {shouldShowLoader ? (
@@ -454,56 +463,58 @@ export default function App() {
             ) : shouldShowLogin ? (
                 <LoginPage t={t} />
             ) : (
-                <Layout
-                    activeTab={activeTab}
-                    onTabChange={handleNavigation}
-                    onNewTransaction={() => { setEditingTransaction(null); setShowTransactionForm(true); }}
-                    privacyMode={privacyMode}
-                    onTogglePrivacy={() => setPrivacyMode(!privacyMode)}
-                    transactions={transactions}
-                    accounts={accounts}
-                    budgets={enrichedBudgets}
-                    investments={investments}
-                    notifications={notifications}
-                    onClearNotifications={() => setNotifications([])}
-                    onAddBudget={(b) => {
-                        const rest = b; // Already Omit<BudgetCategory, "id" | "spent">
-                        // Check if category already exists (UPSERT Logic)
-                        const existing = categories.find(c => c.category === b.category);
-                        if (existing) {
-                            // Update existing category with new limit/type/color/icon
-                            updateCategory({
-                                ...existing,
-                                limit: b.limit,
-                                type: b.type,
-                                color: b.color,
-                                icon_key: b.icon_key
-                            });
-                        } else {
-                            // Create new category
-                            addCategory(rest);
-                        }
-                    }}
-                    onAddTransactionData={(tx) => {
-                        setScannedData(tx);
-                        setActiveTab('transactions');
-                        setShowTransactionForm(true);
-                    }}
-                    userName={profile?.full_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Auth User"}
-                    userEmail={user?.email}
-                    t={t}
-                    onSignOut={() => signOut()}
-                    language={language}
-                    isLoading={loading}
-                >
-                    <Suspense fallback={
-                        <div className="min-h-[50vh] flex items-center justify-center">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gold-500"></div>
-                        </div>
-                    }>
-                        {renderContent()}
-                    </Suspense>
-                </Layout>
+                <SecurityGate>
+                    <Layout
+                        activeTab={activeTab}
+                        onTabChange={handleNavigation}
+                        onNewTransaction={() => { setEditingTransaction(null); setShowTransactionForm(true); }}
+                        privacyMode={privacyMode}
+                        onTogglePrivacy={() => setPrivacyMode(!privacyMode)}
+                        transactions={transactions}
+                        accounts={accounts}
+                        budgets={enrichedBudgets}
+                        investments={investments}
+                        notifications={notifications}
+                        onClearNotifications={() => setNotifications([])}
+                        onAddBudget={(b) => {
+                            const rest = b; // Already Omit<BudgetCategory, "id" | "spent">
+                            // Check if category already exists (UPSERT Logic)
+                            const existing = categories.find(c => c.category === b.category);
+                            if (existing) {
+                                // Update existing category with new limit/type/color/icon
+                                updateCategory({
+                                    ...existing,
+                                    limit: b.limit,
+                                    type: b.type,
+                                    color: b.color,
+                                    icon_key: b.icon_key
+                                });
+                            } else {
+                                // Create new category
+                                addCategory(rest);
+                            }
+                        }}
+                        onAddTransactionData={(tx) => {
+                            setScannedData(tx);
+                            setActiveTab('transactions');
+                            setShowTransactionForm(true);
+                        }}
+                        userName={profile?.full_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Auth User"}
+                        userEmail={user?.email}
+                        t={t}
+                        onSignOut={() => signOut()}
+                        language={language}
+                        isLoading={loading}
+                    >
+                        <Suspense fallback={
+                            <div className="min-h-[50vh] flex items-center justify-center">
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gold-500"></div>
+                            </div>
+                        }>
+                            {renderContent()}
+                        </Suspense>
+                    </Layout>
+                </SecurityGate>
             )}
         </SecurityProvider>
     );

@@ -76,7 +76,7 @@ export const AppLock: React.FC = () => {
     if (!isLocked) return null;
 
     return (
-        <div className="fixed inset-0 z-[100] bg-neutral-950 flex flex-col items-center justify-center text-white animate-fade-in px-6">
+        <div className="min-h-screen w-full bg-neutral-950 flex flex-col items-center justify-center text-white animate-fade-in px-6">
             <div className="mb-8 flex flex-col items-center gap-4">
                 <div className="p-4 bg-gold-500/10 rounded-full text-gold-500 border border-gold-500/20">
                     <Lock size={48} />

@@ -36,7 +36,7 @@
 
   /* Premium Glassmorphism */
   .glass {
-    @apply bg-white/10 dark:bg-neutral-900/40 backdrop-blur-xl border border-white/10 shadow-glass;
+    @apply bg-white/10 dark:bg-neutral-900/40 backdrop-blur-xl border border-white/5 shadow-glass;
   }
 
   /* Glass Card - Subtle for lists */
