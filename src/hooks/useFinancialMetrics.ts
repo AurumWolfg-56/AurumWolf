@@ -91,6 +91,25 @@ export const useFinancialMetrics = ({
         return income - expense;
     }, [transactions, baseCurrency]);
 
+    // Upcoming Bills (Calculated first to be used in Safe to Spend)
+    const upcomingBillsSum = useMemo(() => {
+        const today = new Date();
+        const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        const todayStr = today.toISOString().split('T')[0];
+        const endOfMonthStr = endOfMonth.toISOString().split('T')[0];
+
+        // Sum of recurring payments due between now and end of month
+        return transactions
+            .filter(t =>
+                t.isRecurring &&
+                t.type === 'debit' &&
+                t.nextRecurringDate &&
+                t.nextRecurringDate >= todayStr &&
+                t.nextRecurringDate <= endOfMonthStr
+            )
+            .reduce((acc, t) => acc + convertAmount(t.numericAmount, t.currency || 'USD', baseCurrency), 0);
+    }, [transactions, baseCurrency]);
+
     // Budget Metrics (Safe To Spend)
     const budgetMetrics = useMemo(() => {
         const now = new Date();
@@ -99,35 +118,44 @@ export const useFinancialMetrics = ({
         const currentMonthTx = transactions.filter(t => t.date >= startOfMonth && t.type === 'debit' && t.category !== 'Adjustment');
         const spentThisMonth = currentMonthTx.reduce((acc, t) => acc + convertAmount(t.numericAmount, t.currency || 'USD', baseCurrency), 0);
 
-        const totalBudgetLimit = budgets.reduce((acc, b) => acc + convertAmount(b.limit, 'USD', baseCurrency), 0);
+        // 1. Calculate Budget Ceilings
+        const expenseBudgets = budgets.filter(b => b.type !== 'income');
+        const incomeBudgets = budgets.filter(b => b.type === 'income');
 
-        const incomeThisMonth = transactions
-            .filter(t =>
-                t.date >= startOfMonth &&
-                t.type === 'credit' &&
-                t.category !== 'Adjustment' &&
-                t.category !== 'Starting Balance'
-            )
-            .reduce((acc, t) => acc + convertAmount(t.numericAmount, t.currency || 'USD', baseCurrency), 0);
+        const totalExpenseLimit = expenseBudgets.reduce((acc, b) => acc + convertAmount(b.limit, 'USD', baseCurrency), 0);
+        const totalIncomeTarget = incomeBudgets.reduce((acc, b) => acc + convertAmount(b.limit, 'USD', baseCurrency), 0);
 
-        const safeLimit = totalBudgetLimit > 0 ? totalBudgetLimit : incomeThisMonth;
+        // 2. Sustainable Spend: Lesser of what you planned to spend vs what you expect to earn
+        // If no income budgets set, default to expenses limit (or 0 if neither). 
+        // If no expense budgets, use income.
+        let sustainableSpend = 0;
+        if (totalExpenseLimit > 0 && totalIncomeTarget > 0) {
+            sustainableSpend = Math.min(totalExpenseLimit, totalIncomeTarget);
+        } else {
+            sustainableSpend = Math.max(totalExpenseLimit, totalIncomeTarget);
+        }
 
-        // Logical Safety Cap: One cannot safely spend more than one's liquid assets.
-        // Even if income is high, if cash is low, spending is unsafe.
-        // FIX: liquidAssets should primarily be Personal Cash. Business funds are separate.
-        const liquidAssets = (assetsByType['Cash'] || 0);
-        // Ensure we don't double count if 'Cash' aggregates checking/savings already (which it does in line 39).
-        // Line 39 says: curr.type === 'checking' || curr.type === 'savings' ? 'Cash'
-        // So assetsByType['Cash'] is the total liquid amount.
+        // 3. Financial Reality (Liquidity Check)
+        const liquidAssets = (assetsByType['Cash'] || 0); // Cash on hand
+        const netWorthDeficit = netWorth < 0 ? Math.abs(netWorth) : 0; // "Hole" to fill
 
-        const cappedSafeLimit = Math.min(safeLimit, assetsByType['Cash'] || 0);
+        // Effective Cash = Cash - DebtHole - ImmediateBills
+        const financialReality = Math.max(0, liquidAssets - netWorthDeficit - upcomingBillsSum);
 
-        const leftToSpend = Math.max(0, cappedSafeLimit - spentThisMonth);
-        // Progress is consumed / cappedLimit
-        const progress = cappedSafeLimit > 0 ? (spentThisMonth / cappedSafeLimit) * 100 : 0;
+        // 4. Final Safe Limit
+        // If budgets are 0 (not set up), we fallback to financialReality to be safe, or 0? 
+        // Let's fallback to financialReality if no budgets exist, otherwise respect the budget cap.
+        const safeLimit = sustainableSpend > 0
+            ? Math.min(sustainableSpend, financialReality)
+            : financialReality;
 
-        return { spentThisMonth, totalBudgetLimit, leftToSpend, progress, safeLimit };
-    }, [transactions, budgets, baseCurrency]);
+        const leftToSpend = Math.max(0, safeLimit - spentThisMonth);
+
+        // Progress relative to the determined safe limit
+        const progress = safeLimit > 0 ? (spentThisMonth / safeLimit) * 100 : (spentThisMonth > 0 ? 100 : 0);
+
+        return { spentThisMonth, totalBudgetLimit: totalExpenseLimit, leftToSpend, progress, safeLimit };
+    }, [transactions, budgets, baseCurrency, netWorth, assetsByType, upcomingBillsSum]);
 
     // Health Score
     // Health Score - Robust Calculation

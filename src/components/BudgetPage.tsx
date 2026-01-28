@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import {
     PieChart, Edit2, Plus, Check, Target, Activity, Trophy,
-    DollarSign, X, TrendingUp, TrendingDown, Scale
+    DollarSign, X, TrendingUp, TrendingDown, Scale, BrainCircuit
 } from 'lucide-react';
 import { BudgetCategory, SavingsGoal, Transaction } from '../types';
 import { GoalForm } from './GoalForm';
@@ -12,6 +12,7 @@ import { useAccounts } from '../contexts/AccountsContext';
 
 // Extracted sub-components
 import { BudgetDetailModal, BudgetCard, GoalCard } from './budget';
+import { BudgetAnalyzer } from './budget/BudgetAnalyzer';
 import { getIconComponent } from '../lib/iconMapper';
 
 interface BudgetPageProps {
@@ -48,8 +49,9 @@ export const BudgetPage: React.FC<BudgetPageProps> = ({
     t
 }) => {
     const { accounts } = useAccounts();
-    const [viewMode, setViewMode] = useState<'dashboard' | 'categories'>('dashboard');
+    const [viewMode, setViewMode] = useState<'dashboard' | 'categories' | 'analyzer'>('dashboard');
     const [activeBudgetModal, setActiveBudgetModal] = useState<{ mode: 'budget' | 'category'; data: BudgetCategory | 'new'; returnToBudget?: boolean } | null>(null);
+
     const [activeGoalModal, setActiveGoalModal] = useState<SavingsGoal | 'new' | null>(null);
     const [detailModalItem, setDetailModalItem] = useState<BudgetCategory | null>(null);
     const [depositGoalId, setDepositGoalId] = useState<string | null>(null);
@@ -177,10 +179,23 @@ export const BudgetPage: React.FC<BudgetPageProps> = ({
                 <h2 className="text-xl font-bold text-neutral-900 dark:text-white flex items-center gap-2">
                     {viewMode === 'dashboard'
                         ? <><PieChart size={20} className="text-gold-500" /> {t('budget.allocations')}</>
-                        : <><Edit2 size={20} className="text-purple-500" /> Category Manager</>
+                        : viewMode === 'analyzer'
+                            ? <><Activity size={20} className="text-indigo-500" /> Financial Intelligence</>
+                            : <><Edit2 size={20} className="text-purple-500" /> Category Manager</>
                     }
                 </h2>
                 <div className="flex gap-2">
+                    {/* Analyzer Toggle */}
+                    <button
+                        onClick={() => setViewMode(viewMode === 'analyzer' ? 'dashboard' : 'analyzer')}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all border ${viewMode === 'analyzer'
+                            ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-500'
+                            : 'bg-white dark:bg-neutral-900 text-neutral-400 border-platinum-200 dark:border-neutral-800 hover:text-indigo-500 hover:border-indigo-200'
+                            }`}
+                    >
+                        <BrainCircuit size={14} /> {viewMode === 'analyzer' ? "Close Analyzer" : "Smart Analyzer"}
+                    </button>
+
                     {viewMode === 'dashboard' && (
                         <button
                             onClick={() => setActiveBudgetModal({ mode: 'budget', data: 'new' })}
@@ -189,217 +204,237 @@ export const BudgetPage: React.FC<BudgetPageProps> = ({
                             <Plus size={14} /> {t('common.add')}
                         </button>
                     )}
-                    <button
-                        onClick={() => setViewMode(viewMode === 'dashboard' ? 'categories' : 'dashboard')}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all border ${viewMode === 'categories'
-                            ? 'bg-neutral-900 text-white border-neutral-900 dark:bg-white dark:text-neutral-900 hover:opacity-90'
-                            : 'bg-white dark:bg-neutral-900 text-neutral-400 border-platinum-200 dark:border-neutral-800 hover:text-neutral-900 dark:hover:text-white'
-                            }`}
-                    >
-                        {viewMode === 'categories' ? <Check size={14} /> : <Edit2 size={14} />}
-                        {viewMode === 'categories' ? "Done Managing" : "Manage Categories"}
-                    </button>
-                </div>
-            </div>
 
-            {/* --- CATEGORY MANAGER HINT --- */}
-            {viewMode === 'categories' && (
-                <div className="flex items-center justify-center -mt-2 mb-6 animate-pulse">
-                    <button
-                        onClick={() => setActiveBudgetModal({ mode: 'category', data: 'new' })}
-                        className="bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 px-4 py-2 rounded-full text-xs font-bold flex items-center gap-2 hover:scale-105 transition-transform border border-purple-200 dark:border-purple-800"
-                    >
-                        <Plus size={14} /> Create New Structure Category
-                    </button>
-                </div>
-            )}
-
-
-            {/* --- GOALS SECTION (Only Dashboard) --- */}
-            {viewMode === 'dashboard' && (
-                <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-2">
-                            <Target size={16} className="text-blue-500" /> {t('budget.wealthGoals')}
-                        </h3>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                        {goals.map(goal => (
-                            <GoalCard
-                                key={goal.id}
-                                goal={goal}
-                                isEditing={false}
-                                onEditClick={(g) => setActiveGoalModal(g)}
-                                onDepositClick={(g) => setDepositGoalId(g.id)}
-                                privacyMode={privacyMode}
-                                currencyCode={baseCurrency}
-                                t={t}
-                            />
-                        ))}
+                    {viewMode !== 'analyzer' && (
                         <button
-                            onClick={() => setActiveGoalModal('new')}
-                            className="rounded-2xl border-2 border-dashed border-platinum-300 dark:border-neutral-800 flex flex-col items-center justify-center gap-3 text-neutral-400 dark:text-neutral-600 hover:text-blue-500 dark:hover:text-blue-500 hover:border-blue-500/50 hover:bg-platinum-50 dark:hover:bg-neutral-900/50 transition-all min-h-[150px]"
+                            onClick={() => setViewMode(viewMode === 'dashboard' ? 'categories' : 'dashboard')}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all border ${viewMode === 'categories'
+                                ? 'bg-neutral-900 text-white border-neutral-900 dark:bg-white dark:text-neutral-900 hover:opacity-90'
+                                : 'bg-white dark:bg-neutral-900 text-neutral-400 border-platinum-200 dark:border-neutral-800 hover:text-neutral-900 dark:hover:text-white'
+                                }`}
                         >
-                            <Plus size={24} />
-                            <span className="text-xs font-bold uppercase tracking-wider">{t('budget.newGoal')}</span>
+                            {viewMode === 'categories' ? <Check size={14} /> : <Edit2 size={14} />}
+                            {viewMode === 'categories' ? "Done Managing" : "Manage Categories"}
                         </button>
-                    </div>
-                </div>
-            )}
-
-            {/* --- LISTS --- */}
-
-            {/* EXPENSES */}
-            <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-2">
-                        <TrendingDown size={16} className="text-red-500" />
-                        {viewMode === 'dashboard' ? t('budget.expenseLimits') : "Expense Categories"}
-                    </h3>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                    {displayedExpenses.map(item => (
-                        // Logic Switch based on mode
-                        viewMode === 'dashboard' ? (
-                            <BudgetCard
-                                key={item.id}
-                                item={item}
-                                spent={item.spent}
-                                isEditing={false}
-                                onEditClick={(b) => setActiveBudgetModal({ mode: 'budget', data: b })} // Edit Budget Limit
-                                onClick={(b) => setDetailModalItem(b)}
-                                privacyMode={privacyMode}
-                                currencyCode={baseCurrency}
-                                t={t}
-                            />
-                        ) : (
-                            // CATEGORY CARD COMPONENT
-                            <CategoryCard
-                                key={item.id}
-                                item={item}
-                                onClick={() => setActiveBudgetModal({ mode: 'category', data: item })}
-                            />
-                        )
-                    ))}
-                    {displayedExpenses.length === 0 && viewMode === 'dashboard' && (
-                        <div className="col-span-full p-8 border border-dashed border-platinum-300 dark:border-neutral-800 rounded-2xl text-center text-neutral-500">
-                            No active expense budgets. Click "Add" or "Manage Categories" to set one up.
-                        </div>
                     )}
                 </div>
             </div>
 
-            {/* INCOME */}
-            <div className="space-y-4">
-                <h3 className="text-sm font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-2">
-                    <TrendingUp size={16} className="text-emerald-500" />
-                    {viewMode === 'dashboard' ? t('budget.incomeTargets') : "Income Sources"}
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                    {displayedIncome.map(item => (
-                        viewMode === 'dashboard' ? (
-                            <BudgetCard
-                                key={item.id}
-                                item={item}
-                                spent={item.spent}
-                                isEditing={false}
-                                onEditClick={(b) => setActiveBudgetModal({ mode: 'budget', data: b })}
-                                onClick={(b) => setDetailModalItem(b)}
-                                privacyMode={privacyMode}
-                                currencyCode={baseCurrency}
-                                t={t}
-                            />
-                        ) : (
-                            <CategoryCard
-                                key={item.id}
-                                item={item}
-                                onClick={() => setActiveBudgetModal({ mode: 'category', data: item })}
-                            />
-                        )
-                    ))}
-                </div>
-            </div>
+            {/* --- ANALYZER VIEW --- */}
+            {viewMode === 'analyzer' ? (
+                <BudgetAnalyzer
+                    transactions={transactions}
+                    budgets={budgets}
+                    baseCurrency={baseCurrency}
+                    t={t}
+                />
+            ) : (
+                <>
+                    {/* ... Existing Dashboard/Category View ... */}
 
-            {/* --- MODALS --- */}
-            {
-                activeBudgetModal && (
-                    <BudgetForm
-                        initialData={activeBudgetModal.data === 'new' ? null : activeBudgetModal.data}
-                        mode={activeBudgetModal.mode}
-                        onSave={handleSaveBudget}
-                        onDelete={handleDeleteBudgetHandler}
-                        onCancel={() => setActiveBudgetModal(null)}
-                        onOpenCategoryCreator={
-                            // When in budget mode, clicking "Create New Category" opens category creation mode
-                            activeBudgetModal.mode === 'budget'
-                                ? () => setActiveBudgetModal({ mode: 'category', data: 'new', returnToBudget: true })
-                                : undefined
-                        }
-                    />
-                )
-            }
 
-            {
-                activeGoalModal && (
-                    <GoalForm
-                        initialData={activeGoalModal === 'new' ? null : activeGoalModal}
-                        onSave={handleSaveGoal}
-                        onDelete={handleDeleteGoalHandler}
-                        onCancel={() => setActiveGoalModal(null)}
-                    />
-                )
-            }
-
-            {/* DEPOSIT MODAL */}
-            {
-                depositGoalId && (
-                    <div className="fixed inset-0 z-[80] bg-neutral-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-                        <div className="bg-white dark:bg-neutral-900 border border-platinum-200 dark:border-neutral-800 rounded-3xl p-6 w-full max-w-sm shadow-2xl animate-fade-in relative">
-                            <button onClick={() => setDepositGoalId(null)} className="absolute top-4 right-4 text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors">
-                                <X size={20} />
+                    {/* --- CATEGORY MANAGER HINT --- */}
+                    {viewMode === 'categories' && (
+                        <div className="flex items-center justify-center -mt-2 mb-6 animate-pulse">
+                            <button
+                                onClick={() => setActiveBudgetModal({ mode: 'category', data: 'new' })}
+                                className="bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 px-4 py-2 rounded-full text-xs font-bold flex items-center gap-2 hover:scale-105 transition-transform border border-purple-200 dark:border-purple-800"
+                            >
+                                <Plus size={14} /> Create New Structure Category
                             </button>
-                            <h3 className="text-lg font-bold text-neutral-900 dark:text-white mb-4">{t('budget.addFunds')}</h3>
-                            <form onSubmit={handleExecuteDeposit}>
-                                <label className="block text-xs font-bold text-neutral-500 mb-2 uppercase">{t('common.amount')}</label>
-                                <div className="relative mb-6">
-                                    <DollarSign size={16} className="absolute left-3 top-3.5 text-neutral-500" />
-                                    <input
-                                        type="number"
-                                        value={depositAmount}
-                                        onChange={(e) => setDepositAmount(e.target.value)}
-                                        className="w-full bg-platinum-50 dark:bg-neutral-950 border border-platinum-200 dark:border-neutral-800 text-neutral-900 dark:text-white text-lg font-bold rounded-xl p-3 pl-9 outline-none focus:border-gold-500"
-                                        placeholder="0.00"
-                                        autoFocus
+                        </div>
+                    )}
+
+
+                    {/* --- GOALS SECTION (Only Dashboard) --- */}
+                    {viewMode === 'dashboard' && (
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-sm font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-2">
+                                    <Target size={16} className="text-blue-500" /> {t('budget.wealthGoals')}
+                                </h3>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                                {goals.map(goal => (
+                                    <GoalCard
+                                        key={goal.id}
+                                        goal={goal}
+                                        isEditing={false}
+                                        onEditClick={(g) => setActiveGoalModal(g)}
+                                        onDepositClick={(g) => setDepositGoalId(g.id)}
+                                        privacyMode={privacyMode}
+                                        currencyCode={baseCurrency}
+                                        t={t}
                                     />
-                                    <span className="absolute right-3 top-3.5 text-xs text-neutral-500 font-bold">{baseCurrency}</span>
-                                </div>
-                                <button type="submit" disabled={!depositAmount} className="w-full py-3 bg-gold-500 text-neutral-950 font-bold rounded-xl hover:bg-gold-400 disabled:opacity-50 transition-all">
-                                    {t('budget.confirmDeposit')}
+                                ))}
+                                <button
+                                    onClick={() => setActiveGoalModal('new')}
+                                    className="rounded-2xl border-2 border-dashed border-platinum-300 dark:border-neutral-800 flex flex-col items-center justify-center gap-3 text-neutral-400 dark:text-neutral-600 hover:text-blue-500 dark:hover:text-blue-500 hover:border-blue-500/50 hover:bg-platinum-50 dark:hover:bg-neutral-900/50 transition-all min-h-[150px]"
+                                >
+                                    <Plus size={24} />
+                                    <span className="text-xs font-bold uppercase tracking-wider">{t('budget.newGoal')}</span>
                                 </button>
-                            </form>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* --- LISTS --- */}
+
+                    {/* EXPENSES */}
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-sm font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-2">
+                                <TrendingDown size={16} className="text-red-500" />
+                                {viewMode === 'dashboard' ? t('budget.expenseLimits') : "Expense Categories"}
+                            </h3>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                            {displayedExpenses.map(item => (
+                                // Logic Switch based on mode
+                                viewMode === 'dashboard' ? (
+                                    <BudgetCard
+                                        key={item.id}
+                                        item={item}
+                                        spent={item.spent}
+                                        isEditing={false}
+                                        onEditClick={(b) => setActiveBudgetModal({ mode: 'budget', data: b })} // Edit Budget Limit
+                                        onClick={(b) => setDetailModalItem(b)}
+                                        privacyMode={privacyMode}
+                                        currencyCode={baseCurrency}
+                                        t={t}
+                                    />
+                                ) : (
+                                    // CATEGORY CARD COMPONENT
+                                    <CategoryCard
+                                        key={item.id}
+                                        item={item}
+                                        onClick={() => setActiveBudgetModal({ mode: 'category', data: item })}
+                                    />
+                                )
+                            ))}
+                            {displayedExpenses.length === 0 && viewMode === 'dashboard' && (
+                                <div className="col-span-full p-8 border border-dashed border-platinum-300 dark:border-neutral-800 rounded-2xl text-center text-neutral-500">
+                                    No active expense budgets. Click "Add" or "Manage Categories" to set one up.
+                                </div>
+                            )}
                         </div>
                     </div>
-                )
-            }
 
-            {/* DETAIL MODAL */}
-            {
-                detailModalItem && (
-                    <BudgetDetailModal
-                        item={detailModalItem}
-                        transactions={transactions}
-                        accounts={accounts}
-                        currencyCode={baseCurrency}
-                        onClose={() => setDetailModalItem(null)}
-                        privacyMode={privacyMode}
-                        t={t}
-                    />
-                )
-            }
+                    {/* INCOME */}
+                    <div className="space-y-4">
+                        <h3 className="text-sm font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-2">
+                            <TrendingUp size={16} className="text-emerald-500" />
+                            {viewMode === 'dashboard' ? t('budget.incomeTargets') : "Income Sources"}
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                            {displayedIncome.map(item => (
+                                viewMode === 'dashboard' ? (
+                                    <BudgetCard
+                                        key={item.id}
+                                        item={item}
+                                        spent={item.spent}
+                                        isEditing={false}
+                                        onEditClick={(b) => setActiveBudgetModal({ mode: 'budget', data: b })}
+                                        onClick={(b) => setDetailModalItem(b)}
+                                        privacyMode={privacyMode}
+                                        currencyCode={baseCurrency}
+                                        t={t}
+                                    />
+                                ) : (
+                                    <CategoryCard
+                                        key={item.id}
+                                        item={item}
+                                        onClick={() => setActiveBudgetModal({ mode: 'category', data: item })}
+                                    />
+                                )
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* --- MODALS --- */}
+                    {
+                        activeBudgetModal && (
+                            <BudgetForm
+                                initialData={activeBudgetModal.data === 'new' ? null : activeBudgetModal.data}
+                                mode={activeBudgetModal.mode}
+                                onSave={handleSaveBudget}
+                                onDelete={handleDeleteBudgetHandler}
+                                onCancel={() => setActiveBudgetModal(null)}
+                                onOpenCategoryCreator={
+                                    // When in budget mode, clicking "Create New Category" opens category creation mode
+                                    activeBudgetModal.mode === 'budget'
+                                        ? () => setActiveBudgetModal({ mode: 'category', data: 'new', returnToBudget: true })
+                                        : undefined
+                                }
+                            />
+                        )
+                    }
+
+                    {
+                        activeGoalModal && (
+                            <GoalForm
+                                initialData={activeGoalModal === 'new' ? null : activeGoalModal}
+                                onSave={handleSaveGoal}
+                                onDelete={handleDeleteGoalHandler}
+                                onCancel={() => setActiveGoalModal(null)}
+                            />
+                        )
+                    }
+
+                    {/* DEPOSIT MODAL */}
+                    {
+                        depositGoalId && (
+                            <div className="fixed inset-0 z-[80] bg-neutral-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+                                <div className="bg-white dark:bg-neutral-900 border border-platinum-200 dark:border-neutral-800 rounded-3xl p-6 w-full max-w-sm shadow-2xl animate-fade-in relative">
+                                    <button onClick={() => setDepositGoalId(null)} className="absolute top-4 right-4 text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors">
+                                        <X size={20} />
+                                    </button>
+                                    <h3 className="text-lg font-bold text-neutral-900 dark:text-white mb-4">{t('budget.addFunds')}</h3>
+                                    <form onSubmit={handleExecuteDeposit}>
+                                        <label className="block text-xs font-bold text-neutral-500 mb-2 uppercase">{t('common.amount')}</label>
+                                        <div className="relative mb-6">
+                                            <DollarSign size={16} className="absolute left-3 top-3.5 text-neutral-500" />
+                                            <input
+                                                type="number"
+                                                value={depositAmount}
+                                                onChange={(e) => setDepositAmount(e.target.value)}
+                                                className="w-full bg-platinum-50 dark:bg-neutral-950 border border-platinum-200 dark:border-neutral-800 text-neutral-900 dark:text-white text-lg font-bold rounded-xl p-3 pl-9 outline-none focus:border-gold-500"
+                                                placeholder="0.00"
+                                                autoFocus
+                                            />
+                                            <span className="absolute right-3 top-3.5 text-xs text-neutral-500 font-bold">{baseCurrency}</span>
+                                        </div>
+                                        <button type="submit" disabled={!depositAmount} className="w-full py-3 bg-gold-500 text-neutral-950 font-bold rounded-xl hover:bg-gold-400 disabled:opacity-50 transition-all">
+                                            {t('budget.confirmDeposit')}
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        )
+                    }
+
+                    {/* DETAIL MODAL */}
+                    {
+                        detailModalItem && (
+                            <BudgetDetailModal
+                                item={detailModalItem}
+                                transactions={transactions}
+                                accounts={accounts}
+                                currencyCode={baseCurrency}
+                                onClose={() => setDetailModalItem(null)}
+                                privacyMode={privacyMode}
+                                t={t}
+                            />
+                        )
+                    }
+
+                </>
+            )}
 
         </div >
+
     );
 };
 
