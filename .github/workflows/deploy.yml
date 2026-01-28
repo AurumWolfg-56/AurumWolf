@@ -35,10 +35,10 @@ jobs:
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           local-dir: ./dist/
-          server-dir: domains/aurumwolf.com/public_html/
+          server-dir: ./
           port: 21
           protocol: ftps
-          security: strict
+          security: loose
           timeout: 300000
           log-level: verbose
 
