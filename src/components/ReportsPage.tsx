@@ -115,7 +115,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
                     />
 
                     {/* SUBSEQUENT PAGES: CONTENT */}
-                    <div className="w-[210mm] min-h-[297mm] bg-white text-neutral-900 shadow-2xl p-[15mm] print:shadow-none print:w-full print:h-auto animate-fade-in relative flex flex-col page-break-before">
+                    <div className="w-[210mm] min-h-[297mm] bg-white text-neutral-900 shadow-2xl p-[15mm] print:shadow-none print:w-full print:min-h-0 print:h-auto animate-fade-in relative flex flex-col page-break-before">
 
                         {/* Watermark */}
                         <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none print:opacity-[0.02] overflow-hidden">
