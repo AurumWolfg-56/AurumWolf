@@ -1,5 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import {
     FileText, Printer, X, Shield, Briefcase
 } from 'lucide-react';
@@ -88,8 +89,9 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
     const renderPreview = () => {
         if (!isPreviewOpen) return null;
 
-        return (
-            <div className="fixed inset-0 z-[200] bg-neutral-900/90 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto print:p-0 print:bg-white print:static print:block print:overflow-visible">
+        // Use Portal to move this out of the app root for clean printing
+        return createPortal(
+            <div id="report-print-portal" className="fixed inset-0 z-[200] bg-neutral-900/90 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto print:p-0 print:bg-white print:static print:block print:overflow-visible">
 
                 {/* Overlay Controls */}
                 <div className="fixed top-4 right-4 flex gap-2 print:hidden z-50">
@@ -142,7 +144,8 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
                         </div>
                     </div>
                 </div>
-            </div>
+            </div>,
+            document.body
         );
     }
 

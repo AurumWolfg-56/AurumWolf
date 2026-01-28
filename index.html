@@ -34,12 +34,11 @@
 
   <style>
     body {
-      /* Default to Dark Mode base */
-      background-color: #0a0a0a;
+      /* Default to Dark Mode base - PREVENTS FLASH */
+      background-color: #000000;
       color: #e5e5e5;
-      transition: background-color 0.3s ease, color 0.3s ease;
-      transition: background-color 0.3s ease, color 0.3s ease;
-      /* Prevent rubber-banding on iOS PWA - Removed to fix scroll issue unless needed */
+      margin: 0;
+      /* Prevent rubber-banding on iOS PWA - (Optional) */
     }
 
     /* Neon Silver Theme (Light Mode) */
