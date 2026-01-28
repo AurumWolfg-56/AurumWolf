@@ -17,13 +17,13 @@ const Delta: React.FC<{ val?: number }> = ({ val }) => {
 
 const Row: React.FC<{ label: string, val: MetricValue, ident?: boolean, bold?: boolean }> = ({ label, val, ident, bold }) => (
     <tr className={`border-b border-neutral-50 last:border-0 hover:bg-neutral-50/50 ${bold ? 'font-bold bg-neutral-50/30' : ''}`}>
-        <td className={`px-4 py-2 ${ident ? 'pl-8 text-neutral-500' : 'text-neutral-700'}`}>{label}</td>
-        <td className={`px-4 py-2 text-right font-mono ${bold ? 'text-neutral-900' : 'text-neutral-600'}`}>{val.formatted}</td>
+        <td className={`px-4 py-2 print:py-0.5 ${ident ? 'pl-8 text-neutral-500' : 'text-neutral-700'}`}>{label}</td>
+        <td className={`px-4 py-2 print:py-0.5 text-right font-mono ${bold ? 'text-neutral-900' : 'text-neutral-600'}`}>{val.formatted}</td>
         {/* Previous Value Calculation (Derived) */}
-        <td className="px-4 py-2 text-right font-mono text-neutral-400">
+        <td className="px-4 py-2 print:py-0.5 text-right font-mono text-neutral-400">
             {val.deltaValue !== undefined ? formatCurrency(val.value - val.deltaValue, val.currency, { compact: false }) : '-'}
         </td>
-        <td className="px-4 py-2 text-right">
+        <td className="px-4 py-2 print:py-0.5 text-right">
             <Delta val={val.delta} />
         </td>
     </tr>
@@ -34,8 +34,8 @@ export const PerformanceMatrix: React.FC<{ snapshot: ReportSnapshot }> = ({ snap
     const b = snapshot.business;
 
     return (
-        <div className="mb-10 relative z-10 page-break-inside-avoid">
-            <h2 className="text-sm font-bold text-neutral-900 uppercase tracking-wider border-b border-neutral-200 pb-2 mb-6 flex items-center gap-2">
+        <div className="mb-10 print:mb-4 relative z-10 page-break-inside-avoid">
+            <h2 className="text-sm font-bold text-neutral-900 uppercase tracking-wider border-b border-neutral-200 pb-2 mb-6 print:mb-2 flex items-center gap-2">
                 <CheckCircle2 size={16} className="text-gold-500" /> Performance Matrix
             </h2>
 
@@ -43,15 +43,15 @@ export const PerformanceMatrix: React.FC<{ snapshot: ReportSnapshot }> = ({ snap
                 <table className="w-full text-sm text-left">
                     <thead className="text-[10px] text-neutral-500 uppercase bg-neutral-50 border-b border-neutral-200">
                         <tr>
-                            <th className="px-4 py-3 font-bold">Metric</th>
-                            <th className="px-4 py-3 font-bold text-right">Current</th>
-                            <th className="px-4 py-3 font-bold text-right">Previous</th>
-                            <th className="px-4 py-3 font-bold text-right">Delta</th>
+                            <th className="px-4 py-3 print:py-1.5 font-bold">Metric</th>
+                            <th className="px-4 py-3 print:py-1.5 font-bold text-right">Current</th>
+                            <th className="px-4 py-3 print:py-1.5 font-bold text-right">Previous</th>
+                            <th className="px-4 py-3 print:py-1.5 font-bold text-right">Delta</th>
                         </tr>
                     </thead>
                     <tbody>
                         {/* Personal P&L */}
-                        <tr className="bg-neutral-100/50"><td colSpan={4} className="px-4 py-1.5 text-[10px] font-bold text-neutral-500 uppercase">Personal Flow</td></tr>
+                        <tr className="bg-neutral-100/50"><td colSpan={4} className="px-4 py-1.5 print:py-1 text-[10px] font-bold text-neutral-500 uppercase">Personal Flow</td></tr>
                         <Row label="Total Income" val={s.income} />
                         <Row label="Living Expenses" val={s.expense} />
                         <Row label="Net Savings" val={s.net} bold />
@@ -59,7 +59,7 @@ export const PerformanceMatrix: React.FC<{ snapshot: ReportSnapshot }> = ({ snap
                         {/* Business P&L if exists */}
                         {b && (
                             <>
-                                <tr className="bg-blue-50/50"><td colSpan={4} className="px-4 py-1.5 text-[10px] font-bold text-blue-600 uppercase mt-4">Business Performance</td></tr>
+                                <tr className="bg-blue-50/50"><td colSpan={4} className="px-4 py-1.5 print:py-1 text-[10px] font-bold text-blue-600 uppercase mt-4">Business Performance</td></tr>
                                 <Row label="Gross Revenue" val={b.revenue} />
                                 <Row label="Operating Expenses" val={b.expenses} />
                                 <Row label="Net Profit" val={b.netProfit} bold />
@@ -67,7 +67,7 @@ export const PerformanceMatrix: React.FC<{ snapshot: ReportSnapshot }> = ({ snap
                         )}
 
                         {/* Balance Sheet Items */}
-                        <tr className="bg-gold-50/30"><td colSpan={4} className="px-4 py-1.5 text-[10px] font-bold text-gold-600 uppercase mt-4">Balance Sheet Snapshot</td></tr>
+                        <tr className="bg-gold-50/30"><td colSpan={4} className="px-4 py-1.5 print:py-1 text-[10px] font-bold text-gold-600 uppercase mt-4">Balance Sheet Snapshot</td></tr>
                         <Row label="Liquid Cash" val={s.liquidAssets} />
                         <Row label="Investments" val={s.investedAssets} />
                         <Row label="Total Net Worth" val={s.netWorth} bold />
@@ -85,7 +85,7 @@ export const BusinessLedger: React.FC<{ snapshot: ReportSnapshot }> = ({ snapsho
     const format = (v: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: snapshot.currency }).format(v);
 
     return (
-        <div className="mb-10 relative z-10 page-break-inside-avoid">
+        <div className="mb-10 print:mb-4 relative z-10 page-break-inside-avoid">
             <h2 className="text-sm font-bold text-neutral-900 uppercase tracking-wider border-b border-neutral-200 pb-2 mb-6 flex items-center gap-2">
                 <Briefcase size={16} className="text-gold-500" /> Entity Ledger
             </h2>

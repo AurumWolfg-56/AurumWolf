@@ -63,14 +63,14 @@ export const ExecutiveSummary: React.FC<{ snapshot: ReportSnapshot }> = ({ snaps
     const s = snapshot.summary;
 
     return (
-        <div className="mb-10 relative z-10 page-break-inside-avoid">
-            <div className="flex justify-between items-center border-b border-neutral-200 pb-2 mb-6">
+        <div className="mb-10 print:mb-4 relative z-10 page-break-inside-avoid">
+            <div className="flex justify-between items-center border-b border-neutral-200 pb-2 mb-6 print:mb-2">
                 <h2 className="text-sm font-bold text-neutral-900 uppercase tracking-wider flex items-center gap-2">
                     <Activity size={16} className="text-gold-500" /> Executive Summary
                 </h2>
             </div>
 
-            <div className="grid grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-4 gap-4 mb-6 print:mb-4">
                 <MetricCard label="Net Worth" metric={s.netWorth} icon={TrendingUp} />
                 <MetricCard label="Net Income" metric={s.net} icon={PieChart} accent={s.net.value >= 0 ? 'text-green-700' : 'text-red-600'} />
                 <MetricCard label="Liquid Assets" metric={s.liquidAssets} icon={Briefcase} />
@@ -82,16 +82,16 @@ export const ExecutiveSummary: React.FC<{ snapshot: ReportSnapshot }> = ({ snaps
             </div>
 
             {/* Trends Section */}
-            <div className="bg-neutral-50 rounded-xl p-6 border border-neutral-100 flex gap-8">
+            <div className="bg-neutral-50 rounded-xl p-6 print:p-4 border border-neutral-100 flex gap-8">
                 <div className="flex-1">
-                    <p className="text-xs font-bold text-neutral-500 uppercase mb-4">Capital Trend</p>
-                    <div className="h-24 w-full">
+                    <p className="text-xs font-bold text-neutral-500 uppercase mb-4 print:mb-2">Capital Trend</p>
+                    <div className="h-24 print:h-20 w-full">
                         {/* Placeholder for complex chart, using simple renderer for now */}
                         <SimpleSparkline data={snapshot.trends.netWorth} />
                     </div>
                 </div>
                 {/* Insights Side Panel */}
-                <div className="w-1/3 border-l border-neutral-200 pl-6">
+                <div className="w-1/3 border-l border-neutral-200 pl-6 print:pl-4">
                     <p className="text-xs font-bold text-neutral-500 uppercase mb-2">Key Insights</p>
                     <ul className="space-y-2">
                         {snapshot.dataQuality.warnings.length > 0 ? (
