@@ -4,16 +4,19 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { Layout } from './components/Layout';
 
 // Lazy-loaded pages for code splitting
-const DashboardPage = lazy(() => import('./components/DashboardPage').then(m => ({ default: m.DashboardPage })));
-const AccountsPage = lazy(() => import('./components/AccountsPage').then(m => ({ default: m.AccountsPage })));
-const TransactionsPage = lazy(() => import('./components/TransactionsPage').then(m => ({ default: m.TransactionsPage })));
-const BudgetPage = lazy(() => import('./components/BudgetPage').then(m => ({ default: m.BudgetPage })));
-const BusinessPage = lazy(() => import('./components/BusinessPage').then(m => ({ default: m.BusinessPage })));
+import { lazyWithRetry } from './lib/lazyWithRetry';
+
+// Lazy-loaded pages for code splitting (with failover retry)
+const DashboardPage = lazyWithRetry(() => import('./components/DashboardPage').then(m => ({ default: m.DashboardPage })));
+const AccountsPage = lazyWithRetry(() => import('./components/AccountsPage').then(m => ({ default: m.AccountsPage })));
+const TransactionsPage = lazyWithRetry(() => import('./components/TransactionsPage').then(m => ({ default: m.TransactionsPage })));
+const BudgetPage = lazyWithRetry(() => import('./components/BudgetPage').then(m => ({ default: m.BudgetPage })));
+const BusinessPage = lazyWithRetry(() => import('./components/BusinessPage').then(m => ({ default: m.BusinessPage })));
 import { useBusiness } from './contexts/BusinessContext';
-const InvestmentsPage = lazy(() => import('./components/InvestmentsPage').then(m => ({ default: m.InvestmentsPage })));
-const ReportsPage = lazy(() => import('./components/ReportsPage').then(m => ({ default: m.ReportsPage })));
-const SettingsPage = lazy(() => import('./components/SettingsPage').then(m => ({ default: m.SettingsPage })));
-const ScanPage = lazy(() => import('./components/ScanPage').then(m => ({ default: m.ScanPage })));
+const InvestmentsPage = lazyWithRetry(() => import('./components/InvestmentsPage').then(m => ({ default: m.InvestmentsPage })));
+const ReportsPage = lazyWithRetry(() => import('./components/ReportsPage').then(m => ({ default: m.ReportsPage })));
+const SettingsPage = lazyWithRetry(() => import('./components/SettingsPage').then(m => ({ default: m.SettingsPage })));
+const ScanPage = lazyWithRetry(() => import('./components/ScanPage').then(m => ({ default: m.ScanPage })));
 
 import { TransactionForm } from './components/TransactionForm';
 
