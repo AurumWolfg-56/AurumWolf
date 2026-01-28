@@ -295,3 +295,96 @@
     box-shadow: 0 0 20px rgba(239, 68, 68, 0.3);
   }
 }
+
+/* Scrollbar Utility */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
+}
+
+/* --- PRINT OPTIMIZATIONS (REPORT ENGINE) --- */
+@media print {
+  @page {
+    margin: 0;
+    size: auto;
+  }
+
+  /* Reset App Skeleton */
+  body,
+  html,
+  #root {
+    height: auto !important;
+    overflow: visible !important;
+    background: white !important;
+  }
+
+  /* Hide EVERYTHING by default */
+  body>* {
+    display: none !important;
+  }
+
+  /* Only show the Root */
+  body>#root {
+    display: block !important;
+  }
+
+  /* Inside Root, Hide Navigation, Sidebar, Headers */
+  #root>* {
+    display: none !important;
+  }
+
+  /* But... Show the Modal Layer if it exists */
+  /* This is tricky because the modal is usually portaled or deep in tree. 
+     The implementation in ReportsPage renders the modal INLINE inside Layout/Page. 
+     So we need to aggressively hide siblings of the modal-overlay */
+
+  /* Current Structure: ReportsPage -> Overlay Div. */
+  /* We gave the overlay div the class 'fixed inset-0' etc. */
+
+  /* Let's rely on a specific class for the print container we added: .print-reset */
+
+  /* Reset Visibility for Report Container */
+  .print-reset {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    display: block !important;
+    background: white !important;
+    overflow: visible !important;
+    height: auto !important;
+    z-index: 9999 !important;
+  }
+
+  .print-reset * {
+    visibility: visible !important;
+  }
+
+  /* Ensure Pages Break Correctly */
+  .page-break-before {
+    page-break-before: always !important;
+    break-before: page !important;
+    margin-top: 0 !important;
+  }
+
+  .page-break-after {
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+
+  .page-break-inside-avoid {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Hide Print Controls */
+  button {
+    display: none !important;
+  }
+}
