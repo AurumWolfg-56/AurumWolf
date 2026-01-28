@@ -218,15 +218,13 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onClose, onSav
                                         alt="Scan Preview"
                                         className="w-full h-full object-cover"
                                     />
-                                    {isScanning && (
-                                        <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] flex items-center justify-center overflow-hidden no-flicker">
-                                            <div className="w-full h-1 bg-[#d4af37] absolute top-0 shadow-[0_0_20px_#d4af37] animate-scan" />
-                                            <div className="flex flex-col items-center gap-3">
-                                                <Loader2 className="w-8 h-8 text-[#d4af37] animate-spin" />
-                                                <p className="text-[#d4af37] font-bold tracking-[0.2em] text-[10px] uppercase animate-pulse">Extracting Intelligence</p>
-                                            </div>
+                                    <div className={`absolute inset-0 bg-black/60 backdrop-blur-[2px] flex items-center justify-center overflow-hidden transition-opacity duration-300 ${isScanning ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+                                        <div className="w-full h-1 bg-[#d4af37] absolute top-0 shadow-[0_0_20px_#d4af37] animate-scan" />
+                                        <div className="flex flex-col items-center gap-3">
+                                            <Loader2 className="w-8 h-8 text-[#d4af37] animate-spin" />
+                                            <p className="text-[#d4af37] font-bold tracking-[0.2em] text-[10px] uppercase animate-pulse">Extracting Intelligence</p>
                                         </div>
-                                    )}
+                                    </div>
                                 </div>
                                 <button
                                     onClick={handleReset}

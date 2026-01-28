@@ -393,9 +393,7 @@ export default function App() {
             case 'scan':
                 return <ScanPage
                     onScanComplete={(data) => {
-                        setScannedData(data);
-                        handleNavigation('transactions');
-                        setShowTransactionForm(true);
+                        handleNavigation('transactions', { action: 'scanned', data });
                     }}
                     onCancel={() => handleNavigation('home')}
                     t={t}
