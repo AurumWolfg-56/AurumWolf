@@ -38,6 +38,7 @@ jobs:
           server-dir: domains/aurumwolf.com/public_html/
           port: 21
           protocol: ftps
-          timeout: 120000
+          security: strict
+          timeout: 300000
           log-level: verbose
 
