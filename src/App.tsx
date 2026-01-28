@@ -510,7 +510,7 @@ export default function App() {
                         isLoading={loading}
                     >
                         <Suspense fallback={
-                            <div className="min-h-[50vh] flex items-center justify-center">
+                            <div className="min-h-screen w-full flex items-center justify-center bg-neutral-950">
                                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gold-500"></div>
                             </div>
                         }>

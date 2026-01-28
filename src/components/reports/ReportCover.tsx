@@ -6,11 +6,15 @@ import { ReportSnapshot } from '../../lib/reports/types';
 export const ReportCover: React.FC<{ snapshot: ReportSnapshot; userProfile?: { name: string; email?: string } }> = ({ snapshot, userProfile }) => {
     const { start, end } = snapshot.dateRange;
 
-    // Helper for nice date format
-    const formatDate = (d: string) => new Date(d).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+    // Helper for nice date format - append time to force local interpretation or avoid UTC shift
+    const formatDate = (d: string) => {
+        if (!d) return '';
+        // Appending T12:00:00 ensures we are in the middle of the day, avoiding timezone shifts to previous day
+        return new Date(d + 'T12:00:00').toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+    };
 
     return (
-        <div className="w-[210mm] h-[297mm] relative bg-neutral-900 text-white flex flex-col items-center justify-between p-[20mm] page-break-after overflow-hidden print:bg-neutral-900 print:text-white dark:print:bg-black">
+        <div className="w-[210mm] min-h-[297mm] relative bg-neutral-900 text-white flex flex-col items-center justify-between p-[20mm] overflow-hidden print:w-full print:h-auto print:min-h-[100vh] print:bg-neutral-900 print:text-white dark:print:bg-black">
 
             {/* Background Texture */}
             <div className="absolute inset-0 opacity-20 pointer-events-none">
