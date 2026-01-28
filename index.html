@@ -33,15 +33,17 @@
   <!-- Tailwind CSS -->
 
   <style>
+    html,
     body {
       /* Default to Dark Mode base - PREVENTS FLASH */
       background-color: #000000;
       color: #e5e5e5;
       margin: 0;
-      /* Prevent rubber-banding on iOS PWA - (Optional) */
+      min-height: 100%;
     }
 
     /* Neon Silver Theme (Light Mode) */
+    html:not(.dark),
     html:not(.dark) body {
       background-color: #F1F3F5;
       /* platinum-100 */
@@ -73,53 +75,6 @@
     /* Utilities */
     .pb-safe {
       padding-bottom: env(safe-area-inset-bottom);
-    }
-
-    /* Print Styles */
-    @media print {
-      body {
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-      }
-
-      body * {
-        visibility: hidden;
-      }
-
-      /* Only show specific print containers */
-      .fixed.inset-0.z-\[200\] * {
-        visibility: visible;
-      }
-
-      /* Adjust positioning for print */
-      .fixed.inset-0.z-\[200\] {
-        position: absolute;
-        left: 0;
-        top: 0;
-        width: 100%;
-        height: 100%;
-        background: white;
-        padding: 0;
-        overflow: visible;
-      }
-
-      /* Hide buttons inside the print preview */
-      button,
-      .print\:hidden,
-      .no-print {
-        display: none !important;
-      }
-
-      /* Pagination control */
-      .page-break {
-        page-break-before: always;
-        break-before: page;
-      }
-
-      .avoid-break {
-        page-break-inside: avoid;
-        break-inside: avoid;
-      }
     }
   </style>
   <script type="importmap">

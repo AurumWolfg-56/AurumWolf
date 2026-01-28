@@ -383,4 +383,20 @@
   button {
     display: none !important;
   }
+
+  /* Disable Animations for Print */
+  * {
+    animation: none !important;
+    transition: none !important;
+    opacity: 1 !important;
+    /* Force opacity override */
+  }
+
+  /* Force Text Color */
+  body,
+  .print-reset,
+  .print-reset * {
+    color: #000000 !important;
+    text-shadow: none !important;
+  }
 }
