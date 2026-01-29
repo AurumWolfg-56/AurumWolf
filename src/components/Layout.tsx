@@ -103,7 +103,7 @@ export const Layout: React.FC<LayoutProps> = ({
   };
 
   return (
-    <div className="bg-platinum-100 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-200 font-sans selection:bg-gold-500/30 selection:text-gold-100 transition-colors duration-300 pb-safe relative isolate">
+    <div className="min-h-screen bg-platinum-100 dark:bg-transparent text-neutral-900 dark:text-neutral-200 font-sans selection:bg-gold-500/30 selection:text-gold-100 transition-colors duration-300 relative isolate">
       {/* Ambient Background Glows */}
       {/* Ambient Background Glows */}
 
@@ -207,6 +207,8 @@ export const Layout: React.FC<LayoutProps> = ({
       <main className="
         relative 
         md:ml-72 
+        h-screen
+        flex flex-col
         transition-all 
         duration-300 
         ease-in-out
@@ -277,18 +279,19 @@ export const Layout: React.FC<LayoutProps> = ({
           </div>
         </header>
 
-        {/* Scrollable Content */}
-        <div className="pt-20 md:pt-8 pb-20 md:pb-12 px-4 md:px-8 max-w-7xl mx-auto animate-fade-in">
+        {/* --- SCROLLABLE CONTENT --- */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar">
+          <div className="pt-20 md:pt-8 pb-12 px-4 md:px-8 max-w-7xl mx-auto animate-fade-in pb-safe">
+            {/* Page Title Section */}
+            <div className="hidden md:block mb-10">
+              <h1 className="text-3xl font-display font-bold text-neutral-900 dark:text-white tracking-tight drop-shadow-sm">
+                {getPageTitle(activeTab)}
+              </h1>
+              <p className="text-neutral-500 mt-2 text-sm">{t('titles.welcome')}, {userName}</p>
+            </div>
 
-          {/* Page Title Section */}
-          <div className="hidden md:block mb-10">
-            <h1 className="text-3xl font-display font-bold text-neutral-900 dark:text-white tracking-tight drop-shadow-sm">
-              {getPageTitle(activeTab)}
-            </h1>
-            <p className="text-neutral-500 mt-2 text-sm">{t('titles.welcome')}, {userName}</p>
+            {children}
           </div>
-
-          {children}
         </div>
       </main>
 
@@ -327,6 +330,6 @@ export const Layout: React.FC<LayoutProps> = ({
         accounts={accounts}
         transactions={transactions}
       />
-    </div>
+    </div >
   );
 };

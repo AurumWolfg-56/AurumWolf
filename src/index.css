@@ -4,9 +4,12 @@
 
 @layer base {
 
-  html,
+  html {
+    @apply h-full;
+  }
+
   body {
-    @apply h-full overflow-y-auto antialiased transition-colors duration-300 aurora-bg text-white;
+    @apply min-h-full overflow-hidden antialiased transition-colors duration-300 aurora-bg text-white;
   }
 
   .pt-safe {
@@ -46,7 +49,9 @@
 
   /* Aurora Background */
   .aurora-bg {
-    @apply relative min-h-screen bg-neutral-950 overflow-x-hidden;
+    @apply relative bg-neutral-950;
+    min-height: 100vh;
+    min-height: 100dvh;
   }
 
   .aurora-bg::before {
