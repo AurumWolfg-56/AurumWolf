@@ -184,11 +184,7 @@ export function LoginPage({ t }: LoginPageProps) {
 
                 </form>
 
-                {/* Biometric Login Button - DISABLED 
-                    Reason: Biometrics confirm local identity but cannot retrieve Supabase session without Passkeys.
-                    This prevents the user loop where they verify biometrics but still need to enter password.
-                 */}
-                {/* 
+                {/* Biometric Login Button */}
                 {biometricsEnabled && mode === 'signin' && (
                     <div className="mt-4">
                         <button
@@ -201,7 +197,6 @@ export function LoginPage({ t }: LoginPageProps) {
                         </button>
                     </div>
                 )}
-                */}
 
                 <div className="mt-6 text-center">
                     <div className="flex flex-col gap-3">

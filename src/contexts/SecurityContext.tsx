@@ -28,10 +28,7 @@ const STORAGE_KEYS = {
 
 export function SecurityProvider({ children }: { children: React.ReactNode }) {
     // Current state is memory-only for security
-    const [isLocked, setIsLocked] = useState(() => {
-        const pinExists = !!localStorage.getItem(STORAGE_KEYS.PIN_HASH);
-        return pinExists; // Always start locked if a PIN exists
-    });
+    const [isLocked, setIsLocked] = useState(false);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [hasPin, setHasPin] = useState(() => !!localStorage.getItem(STORAGE_KEYS.PIN_HASH));
     const [biometricsEnabled, setBiometricsEnabled] = useState(() => localStorage.getItem(STORAGE_KEYS.BIOMETRICS_ENABLED) === 'true');
@@ -66,37 +63,20 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     };
 
     const setupPin = async (pin: string) => {
-        const hash = await hashPin(pin);
-        localStorage.setItem(STORAGE_KEYS.PIN_HASH, hash);
-        setHasPin(true);
-        setIsAuthenticated(true);
-        setIsLocked(false);
+        // Disabled
     };
 
     const verifyPin = async (inputPin: string): Promise<boolean> => {
-        const storedHash = localStorage.getItem(STORAGE_KEYS.PIN_HASH);
-        if (!storedHash) return false;
-
-        const inputHash = await hashPin(inputPin);
-        if (inputHash === storedHash) {
-            setIsAuthenticated(true);
-            setIsLocked(false);
-            return true;
-        }
-        return false;
+        return true;
     };
 
     const lock = () => {
-        if (hasPin) {
-            setIsLocked(true);
-            setIsAuthenticated(false);
-        }
+        // Disabled
     };
 
     const unlock = () => {
         setIsLocked(false);
         setIsAuthenticated(true);
-        localStorage.setItem('aurum_last_active', Date.now().toString());
     };
 
     // --- BIOMETRIC UTILITIES ---
@@ -247,107 +227,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
-    // Ensure app is visible when lock state changes (e.g. after mounting Lock Screen)
-    useEffect(() => {
-        // Force reveal when lock state settles
-        const t = setTimeout(() => document.body.classList.remove('app-paused'), 150);
-        return () => clearTimeout(t);
-    }, [isLocked]);
 
-    // --- CRITICAL: AUTO-LOCK WITH SCANNER PROTECTION ---
-    useEffect(() => {
-        if (!hasPin) return;
-
-        const enforceLock = () => {
-            // Double-check bypass synchronously - critical for preventing flicker
-            if (bypassRef.current === true) return;
-
-            // Also check for active scanner
-            if (document.querySelector('.scanner-container')) return;
-
-            console.log("Security Event: Locking app");
-            lock();
-            localStorage.setItem('aurum_last_active', Date.now().toString());
-        };
-
-        const reEntryCheck = () => {
-            if (bypassRef.current) return;
-            if (document.querySelector('.scanner-container')) return;
-
-            const now = Date.now();
-            const lastActive = parseInt(localStorage.getItem('aurum_last_active') || '0');
-
-            if (document.visibilityState === 'visible') {
-                // RESUMING
-                if (lastActive > 0 && now - lastActive > 5000) {
-                    // Should Lock
-                    enforceLock();
-                    // Don't unpause here; let the isLocked effect handle it
-                } else {
-                    // Safe to reveal
-                    toggleAppPause(false);
-                }
-                localStorage.setItem('aurum_last_active', now.toString());
-            } else {
-                // HIDING
-                // Only lock on visibility hidden if no active operations
-                if (!bypassRef.current && !document.querySelector('.scanner-container')) {
-                    toggleAppPause(true); // Hide immediately
-                    enforceLock();
-                }
-            }
-        };
-
-        const handlePageHide = () => {
-            toggleAppPause(true);
-            enforceLock();
-        };
-
-        // --- BLUR DETECTION (For quicker "Leaving" detection) ---
-        const blurTimeoutRef = { current: null as any };
-
-        const handleBlur = () => {
-            if (bypassRef.current || document.querySelector('.scanner-container')) return;
-
-            // Debounce to avoid flickering on file pickers/system dialogs
-            blurTimeoutRef.current = setTimeout(() => {
-                toggleAppPause(true);
-                // We don't necessarily forceful lock on blur, but we hide content
-                // enforceLock(); // Optional: stick to visibility hidden for locking
-            }, 200);
-        };
-
-        const handleFocus = () => {
-            if (blurTimeoutRef.current) {
-                clearTimeout(blurTimeoutRef.current);
-                blurTimeoutRef.current = null;
-            }
-            reEntryCheck();
-        };
-
-        document.addEventListener("visibilitychange", reEntryCheck);
-        window.addEventListener("pagehide", handlePageHide);
-        window.addEventListener("beforeunload", handlePageHide);
-        window.addEventListener("blur", handleBlur);
-        window.addEventListener("focus", handleFocus);
-
-        return () => {
-            document.removeEventListener("visibilitychange", reEntryCheck);
-            window.removeEventListener("pagehide", handlePageHide);
-            window.removeEventListener("beforeunload", handlePageHide);
-            window.removeEventListener("blur", handleBlur);
-            window.removeEventListener("focus", handleFocus);
-        };
-    }, [hasPin]);
-
-    // Constant heartbeat to keep 'last_active' fresh while app is open
-    useEffect(() => {
-        if (!hasPin || isLocked) return;
-        const interval = setInterval(() => {
-            localStorage.setItem('aurum_last_active', Date.now().toString());
-        }, 1000);
-        return () => clearInterval(interval);
-    }, [hasPin, isLocked]);
 
     return (
         <SecurityContext.Provider value={{

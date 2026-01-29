@@ -98,7 +98,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
    notificationsEnabled = true,
    onToggleNotifications
 }) => {
-   const { hasPin, biometricsEnabled, toggleBiometrics, setupPin, removePin } = useSecurity(); // Hook usage
+   const { biometricsEnabled, toggleBiometrics } = useSecurity(); // Hook usage
    const [isDarkMode, setIsDarkMode] = React.useState(true);
    const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -424,40 +424,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                         </div>
                      )}
                   </div>
-                  <button
-                     onClick={() => {
-                        if (hasPin) {
-                           if (window.confirm("Disable Security PIN?")) {
-                              removePin();
-                           }
-                        } else {
-                           const newPin = window.prompt("Set 4-digit PIN");
-                           if (newPin?.length === 4 && !isNaN(Number(newPin))) {
-                              setupPin(newPin);
-                              alert("PIN Set Successfully");
-                           } else if (newPin) {
-                              alert("PIN must be 4 digits");
-                           }
-                        }
-                     }}
-                     className="w-full p-4 flex items-center justify-between hover:bg-neutral-50 dark:hover:bg-neutral-800/30 transition-colors text-left"
-                  >
-                     <div className="flex items-center gap-3">
-                        <div className="p-2 bg-neutral-100 dark:bg-neutral-950 rounded-lg text-neutral-400 transition-colors"><Lock size={18} /></div>
-                        <div>
-                           <p className="text-sm font-bold text-neutral-900 dark:text-white transition-colors">
-                              {hasPin ? "Remove PIN" : "Set Setup PIN"}
-                           </p>
-                           <p className="text-xs text-neutral-500">
-                              {hasPin ? "Tap to disable App Lock" : "Tap to enable App Lock"}
-                           </p>
-                        </div>
-                     </div>
-                     <div className='flex items-center gap-2 text-gold-500'>
-                        {hasPin && <span className="text-xs font-mono bg-gold-500/10 px-2 py-1 rounded">ACTIVE</span>}
-                        <ChevronRight size={16} className="text-neutral-500" />
-                     </div>
-                  </button>
+
                </div>
             </div>
 
