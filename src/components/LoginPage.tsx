@@ -63,19 +63,15 @@ export function LoginPage({ t }: LoginPageProps) {
     const { loginWithBiometrics } = useSecurity(); // Destructure properly
 
     const handleBiometricLogin = async () => {
-        if (!email) {
-            setError("Please enter your email to sign in with biometrics.");
-            return;
-        }
         setLoading(true);
         setError(null);
         try {
-            await loginWithBiometrics(email);
+            await loginWithBiometrics();
             setMessage("Login successful. Resuming session...");
             // AuthContext handles redirect
         } catch (e: any) {
             console.error(e);
-            setError(e.message || "Biometric login failed. Make sure you have setup biometrics in Settings.");
+            setError(e.message || "Biometric login failed.");
         } finally {
             setLoading(false);
         }

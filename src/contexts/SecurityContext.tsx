@@ -13,7 +13,7 @@ interface SecurityContextType {
     toggleBiometrics: (enabled: boolean) => Promise<void>;
     removePin: () => void;
     verifyBiometrics: () => Promise<boolean>;
-    loginWithBiometrics: (email: string) => Promise<void>;
+    loginWithBiometrics: (email?: string) => Promise<void>;
     lastBiometricError: string | null;
     isSecurityBypassed: boolean;
     setSecurityBypass: (enabled: boolean) => void;
@@ -26,6 +26,7 @@ const STORAGE_KEYS = {
     BIOMETRICS_ENABLED: 'aurum_security_bio',
     CREDENTIAL_ID: 'aurum_security_cred_id',
     VAULT: 'aurum_vault_data',
+    VAULT_EMAIL: 'aurum_vault_email',
     LOCK_TIMEOUT: 'aurum_security_timeout'
 };
 
@@ -141,17 +142,20 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         return false;
     };
 
-    const loginWithBiometrics = async (email: string) => {
+    const loginWithBiometrics = async (email?: string) => {
         const verified = await verifyBiometrics();
         if (!verified) throw new Error("Biometric verification failed");
 
         const vault = localStorage.getItem(STORAGE_KEYS.VAULT);
-        if (!vault) throw new Error("No secure credentials found. Please toggle Biometrics off and on in Settings to reset.");
+        // If email not provided, try to get from vault
+        const vaultEmail = email || localStorage.getItem(STORAGE_KEYS.VAULT_EMAIL);
+
+        if (!vault || !vaultEmail) throw new Error("No secure credentials found. Please toggle Biometrics off and on in Settings to reset.");
 
         try {
             const password = atob(vault); // Simple de-obfuscation
             const { error } = await supabase.auth.signInWithPassword({
-                email,
+                email: vaultEmail,
                 password
             });
             if (error) throw error;
@@ -170,9 +174,16 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 return;
             }
 
-            // Prompt for password to store in vault
+            // Prompt for password
             const password = window.prompt("Para habilitar el inicio de sesión biométrico, ingresa tu contraseña actual:");
             if (!password) return;
+
+            // Get current user email to store
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user?.email) {
+                alert("Error: No se pudo identificar el usuario actual.");
+                return;
+            }
 
             try {
                 setSecurityBypass(true);
@@ -185,7 +196,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                         rp: { name: "AurumWolf", id: window.location.hostname },
                         user: {
                             id: crypto.getRandomValues(new Uint8Array(16)),
-                            name: "user@aurumwolf.app",
+                            name: user.email,
                             displayName: "AurumWolf User"
                         },
                         pubKeyCredParams: [{ alg: -7, type: "public-key" }, { alg: -257, type: "public-key" }],
@@ -196,7 +207,8 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
 
                 if (credential) {
                     localStorage.setItem(STORAGE_KEYS.CREDENTIAL_ID, credential.id);
-                    localStorage.setItem(STORAGE_KEYS.VAULT, btoa(password)); // Store obfuscated password
+                    localStorage.setItem(STORAGE_KEYS.VAULT, btoa(password));
+                    localStorage.setItem(STORAGE_KEYS.VAULT_EMAIL, user.email); // Store email
                     setBiometricsEnabled(true);
                     localStorage.setItem(STORAGE_KEYS.BIOMETRICS_ENABLED, 'true');
                     alert("¡Biometría vinculada correctamente!");
@@ -215,6 +227,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             localStorage.setItem(STORAGE_KEYS.BIOMETRICS_ENABLED, 'false');
             localStorage.removeItem(STORAGE_KEYS.CREDENTIAL_ID);
             localStorage.removeItem(STORAGE_KEYS.VAULT);
+            localStorage.removeItem(STORAGE_KEYS.VAULT_EMAIL);
             console.log("Biometrics: Disabled");
         }
     };
