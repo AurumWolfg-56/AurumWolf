@@ -103,7 +103,7 @@ export const Layout: React.FC<LayoutProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-platinum-100 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-200 font-sans selection:bg-gold-500/30 selection:text-gold-100 transition-colors duration-300 pb-safe relative isolate">
+    <div className="bg-platinum-100 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-200 font-sans selection:bg-gold-500/30 selection:text-gold-100 transition-colors duration-300 pb-safe relative isolate">
       {/* Ambient Background Glows */}
       {/* Ambient Background Glows */}
 
@@ -206,7 +206,6 @@ export const Layout: React.FC<LayoutProps> = ({
       {/* Main Content Area */}
       <main className="
         relative 
-        min-h-screen 
         md:ml-72 
         transition-all 
         duration-300 
@@ -279,7 +278,7 @@ export const Layout: React.FC<LayoutProps> = ({
         </header>
 
         {/* Scrollable Content */}
-        <div className="pt-20 md:pt-8 pb-32 md:pb-12 px-4 md:px-8 max-w-7xl mx-auto animate-fade-in">
+        <div className="pt-20 md:pt-8 pb-20 md:pb-12 px-4 md:px-8 max-w-7xl mx-auto animate-fade-in">
 
           {/* Page Title Section */}
           <div className="hidden md:block mb-10">

@@ -28,19 +28,7 @@ export function LoginPage({ t }: LoginPageProps) {
         setMessage(null);
 
         try {
-            if (mode === 'signup') {
-                const { error } = await supabase.auth.signUp({
-                    email,
-                    password,
-                    options: {
-                        data: {
-                            full_name: fullName,
-                        }
-                    }
-                });
-                if (error) throw error;
-                setMessage('Check your email for the confirmation link!');
-            } else if (mode === 'reset') {
+            if (mode === 'reset') {
                 const { error } = await supabase.auth.resetPasswordForEmail(email, {
                     redirectTo: `${window.location.origin}/`,
                 });
@@ -108,22 +96,6 @@ export function LoginPage({ t }: LoginPageProps) {
                 )}
 
                 <form onSubmit={handleAuth} className="space-y-4">
-                    {mode === 'signup' && (
-                        <div className="animate-fade-in">
-                            <label className="block text-sm font-medium text-slate-400 mb-1.5">{t('common.fullName')}</label>
-                            <div className="relative">
-                                <input
-                                    type="text"
-                                    required
-                                    value={fullName}
-                                    onChange={(e) => setFullName(e.target.value)}
-                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-slate-200 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50 transition-all outline-none"
-                                    placeholder="John Doe"
-                                    minLength={2}
-                                />
-                            </div>
-                        </div>
-                    )}
 
                     <div>
                         <label className="block text-sm font-medium text-slate-400 mb-1.5">{t('common.email')}</label>
@@ -206,17 +178,15 @@ export function LoginPage({ t }: LoginPageProps) {
                                 Forgot your password?
                             </button>
                         )}
-                        <button
-                            type="button"
-                            onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')}
-                            className="text-amber-500 hover:text-amber-400 text-sm font-medium transition-colors"
-                        >
-                            {mode === 'signin'
-                                ? t('auth.noAccount') + " " + t('auth.signUp')
-                                : mode === 'reset'
-                                    ? "Back to Sign In"
-                                    : t('auth.haveAccount') + " " + t('auth.signIn')}
-                        </button>
+                        {mode === 'reset' && (
+                            <button
+                                type="button"
+                                onClick={() => setMode('signin')}
+                                className="text-amber-500 hover:text-amber-400 text-sm font-medium transition-colors"
+                            >
+                                Back to Sign In
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
