@@ -99,6 +99,7 @@ export interface Transaction {
   recurringFrequency?: RecurringFrequency;
   nextRecurringDate?: string;
   recurringEndDate?: string;
+  transfer_link_id?: string;
 }
 
 export interface Insight {

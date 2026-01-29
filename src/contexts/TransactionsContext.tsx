@@ -12,7 +12,7 @@ interface TransactionsContextType {
   addTransaction: (tx: Transaction) => Promise<void>;
   updateTransaction: (tx: Transaction) => Promise<void>;
   deleteTransaction: (id: string) => Promise<boolean>;
-  refreshTransactions: (txs: Transaction[]) => void;
+  refreshTransactions: () => Promise<void>;
   loading: boolean;
 }
 
@@ -164,7 +164,34 @@ export const TransactionsProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const refreshTransactions = (txs: Transaction[]) => setTransactions(txs);
+  const refreshTransactions = async () => {
+    if (!user) return;
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('*')
+      .order('date', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching transactions:', error);
+    } else {
+      const candidates = (data || []).map((row: any) => ({
+        ...row,
+        accountId: row.account_id,
+        numericAmount: Number(row.amount),
+        business_id: row.business_id,
+        isRecurring: row.is_recurring,
+        recurringFrequency: row.recurring_frequency,
+        nextRecurringDate: row.next_recurring_date,
+        recurringEndDate: row.recurring_end_date,
+        ...row.metadata
+      }));
+
+      const validTransactions = parseSupabaseData(TransactionSchema, candidates, []) as Transaction[];
+      setTransactions(validTransactions);
+    }
+    setLoading(false);
+  };
 
   return (
     <TransactionsContext.Provider value={{ transactions, addTransaction, updateTransaction, deleteTransaction, refreshTransactions, loading }}>

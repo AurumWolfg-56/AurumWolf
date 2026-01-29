@@ -515,7 +515,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
             <button
               type="button"
               onClick={() => setIsSplit(true)}
-              className="absolute top-0 right-0 text-[10px] text-gold-500 hover:text-gold-400 font-bold flex items-center gap-1 mt-1 uppercase tracking-wide transition-colors"
+              className="absolute top-0 right-0 bg-platinum-100 dark:bg-neutral-800 hover:bg-gold-500/10 hover:text-gold-500 text-neutral-500 dark:text-neutral-400 text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-all shadow-sm border border-platinum-200 dark:border-neutral-700"
             >
               <Split size={12} /> {t('transactionForm.splitTransaction')}
             </button>

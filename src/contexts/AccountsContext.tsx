@@ -1,5 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { toast } from 'sonner';
 import { Account } from '../types';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
@@ -12,7 +13,7 @@ interface AccountsContextType {
   addAccount: (account: Account) => Promise<void>;
   updateAccount: (account: Account) => Promise<void>;
   deleteAccount: (id: string) => Promise<void>;
-  refreshAccounts: (accounts: Account[]) => void;
+  refreshAccounts: () => Promise<void>;
   loading: boolean;
 }
 
@@ -93,7 +94,7 @@ export const AccountsProvider = ({ children }: { children: ReactNode }) => {
       // Rollback
       setAccounts(prevAccounts);
       // Optional: Toast notification here if we had a toast system
-      alert("Failed to save account. Please check your connection.");
+      toast.error("Failed to save account. Please check your connection.");
     }
   };
 
@@ -141,7 +142,32 @@ export const AccountsProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const refreshAccounts = (accts: Account[]) => setAccounts(accts);
+  const refreshAccounts = async () => {
+    if (!user) return;
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('accounts')
+      .select('*')
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching accounts:', error);
+    } else {
+      const candidates = (data || []).map((row: any) => ({
+        ...row,
+        isFrozen: row.is_frozen,
+        creditDetails: row.credit_details,
+        businessDetails: row.business_details,
+        linked_business_id: row.linked_business_id,
+        balance: Number(row.balance)
+      }));
+
+      const validAccounts = parseSupabaseData(AccountSchema, candidates, []) as Account[];
+      setAccounts(validAccounts);
+    }
+    setLoading(false);
+  };
+
 
   return (
     <AccountsContext.Provider value={{ accounts, addAccount, updateAccount, deleteAccount, refreshAccounts, loading }}>

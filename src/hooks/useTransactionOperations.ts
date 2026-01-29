@@ -4,6 +4,19 @@ import { supabase } from '../lib/supabase';
 import { Transaction, Account } from '../types';
 import { convertAmount } from '../lib/money';
 import { ErrorService } from '../lib/errorService';
+import { toast } from 'sonner';
+
+// Define RPC params interface for type safety
+interface PerformTransferParams {
+    p_from_account_id: string;
+    p_to_account_id: string;
+    p_amount: number;
+    p_date: string;
+    p_description: string;
+    p_currency: string;
+    p_converted_amount: number;
+    p_to_currency: string;
+}
 
 interface UseTransactionOperationsProps {
     transactions: Transaction[];
@@ -11,6 +24,8 @@ interface UseTransactionOperationsProps {
     addTransaction: (tx: Transaction) => Promise<void>;
     deleteTransaction: (id: string) => Promise<boolean>;
     updateAccount: (account: Account) => Promise<void>;
+    refreshAccounts: () => Promise<void>;
+    refreshTransactions: () => Promise<void>;
 }
 
 export const useTransactionOperations = ({
@@ -18,7 +33,9 @@ export const useTransactionOperations = ({
     accounts,
     addTransaction,
     deleteTransaction,
-    updateAccount
+    updateAccount,
+    refreshAccounts,
+    refreshTransactions
 }: UseTransactionOperationsProps) => {
 
     const handleTransfer = useCallback(async (fromAccountId: string, toAccountId: string, amount: number, date: string) => {
@@ -34,8 +51,7 @@ export const useTransactionOperations = ({
 
         try {
             // New Atomic Logic using RPC
-            // @ts-ignore
-            const { error, data } = await supabase.rpc('perform_transfer', {
+            const rpcParams: PerformTransferParams = {
                 p_from_account_id: fromAccountId,
                 p_to_account_id: toAccountId,
                 p_amount: amount,
@@ -44,7 +60,9 @@ export const useTransactionOperations = ({
                 p_currency: fromAcc.currency,
                 p_converted_amount: convertedAmount,
                 p_to_currency: toAcc.currency
-            });
+            };
+
+            const { error } = await supabase.rpc('perform_transfer', rpcParams);
 
             if (error) {
                 ErrorService.log(new Error("Atomic Transfer RPC Error"), 'error', {
@@ -52,32 +70,32 @@ export const useTransactionOperations = ({
                     fromAccountId,
                     toAccountId
                 });
-                alert("Transfer failed: " + error.message);
+                toast.error("Transfer failed: " + error.message);
                 return;
             }
 
-            // ... (rest of logic) ...
+            // Refresh state instead of full reload
+            await Promise.all([refreshAccounts(), refreshTransactions()]);
 
         } catch (e) {
             ErrorService.log(e as Error, 'error', { context: 'handleTransfer exception' });
         }
 
-    }, [accounts, transactions, updateAccount]);
+    }, [accounts, transactions, updateAccount, refreshAccounts, refreshTransactions]);
 
     const handleDeleteTransaction = useCallback(async (id: string) => {
         const tx = transactions.find(t => t.id === id);
         if (!tx) return;
 
         // Check for linked transfer
-        // @ts-ignore
         const linkId = tx.transfer_link_id;
 
         let idsToDelete = [id];
         if (linkId) {
             // Find the partner
-            // @ts-ignore
             const partner = transactions.find(t => t.transfer_link_id === linkId && t.id !== id);
             if (partner) {
+                // TODO: Replace with better UI confirmation in future phase
                 if (confirm("This is part of a transfer. Delete the other side as well?")) {
                     idsToDelete.push(partner.id);
                 }
@@ -89,13 +107,14 @@ export const useTransactionOperations = ({
         }
 
         // Final balance update logic...
-        // (Simplified for brevity, assuming context updates or reload)
-        window.location.reload();
+        // Refresh state instead of full reload
+        await Promise.all([refreshAccounts(), refreshTransactions()]);
 
-    }, [transactions, accounts, deleteTransaction, updateAccount]);
+    }, [transactions, accounts, deleteTransaction, updateAccount, refreshAccounts, refreshTransactions]);
 
     return {
         handleTransfer,
         handleDeleteTransaction
     };
 };
+

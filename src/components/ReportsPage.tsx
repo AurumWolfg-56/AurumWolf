@@ -105,13 +105,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
 
 
 
-                <style>{`
-                    @media print {
-                        @page { size: A4; margin: 0; }
-                        body { margin: 0; -webkit-print-color-adjust: exact; }
-                        .print-reset { width: 100%; }
-                    }
-                `}</style>
+                {/* Styles moved to index.css */}
 
                 {/* REPORT CONTAINER - RESET FOR PRINT */}
                 < div className="print-reset" >

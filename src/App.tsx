@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useRef, useMemo, useCallback, Suspense, lazy } from 'react';
+import { Toaster } from 'sonner';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Layout } from './components/Layout';
 
@@ -198,7 +199,9 @@ export default function App() {
         accounts,
         addTransaction,
         deleteTransaction,
-        updateAccount
+        updateAccount,
+        refreshAccounts,
+        refreshTransactions
     });
 
     // --- RENDER ---
@@ -447,6 +450,7 @@ export default function App() {
 
     return (
         <SecurityProvider>
+            <Toaster richColors position="top-right" />
             {/* Privacy Shield remains for OS-level protection */}
             <PrivacyShield />
 

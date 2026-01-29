@@ -1,10 +1,11 @@
 
 import React, { useMemo, useState, useRef, useEffect } from 'react';
+import { toast } from 'sonner';
 import {
     TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, Shield, Calendar,
     BrainCircuit, PieChart, AlertTriangle, ArrowRight, Activity, Zap, CreditCard,
     Building, ChevronRight, MoreHorizontal, Wallet, Loader2, Repeat, Briefcase, Gauge, Play, Volume2, StopCircle,
-    Plus, Camera, ArrowRightLeft, RefreshCw, Maximize2 // [NEW] Icons for Quick Actions
+    Plus, Camera, ArrowRightLeft, RefreshCw, Maximize2, FileText // [NEW] Icons for Quick Actions
 } from 'lucide-react';
 import { CurrencyConverter } from './CurrencyConverter';
 import { Type } from "@google/genai";
@@ -248,7 +249,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                     }
                 } catch (e) {
                     console.error("Failed to parse AI response", e);
-                    alert("AI Response invalid format");
+                    toast.error("AI Response invalid format");
                 }
             }
 
@@ -258,11 +259,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
             // Check for custom AIError code
             if (error.code === 'QUOTA_EXCEEDED') {
                 // Could set a specific UI state here, but for now specific alert is better than generic
-                alert("⚠️ AI is busy (Quota Exceeded). Please wait 30s and try again.");
+                toast.warning("⚠️ AI is busy (Quota Exceeded). Please wait 30s and try again.");
             } else if (error.code === 'UNAUTHORIZED') {
-                alert("Please log in again to use AI features.");
+                toast.error("Please log in again to use AI features.");
             } else {
-                alert(`AI Analysis Failed: ${error.message || "Unknown error"}. Check API Key or Connection.`);
+                toast.error(`AI Analysis Failed: ${error.message || "Unknown error"}. Check API Key or Connection.`);
             }
         } finally {
             setIsAnalyzing(false);
@@ -543,7 +544,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                         <div className="md:col-span-1 xl:col-span-3 glass rounded-[1.5rem] md:rounded-[2.5rem] p-5 md:p-8 shadow-xl flex flex-col justify-center group hover:border-gold-500/20 transition-colors duration-500">
                             <h3 className="text-xs font-bold text-neutral-400 uppercase tracking-wider mb-4 md:mb-6 ml-1">{t('dashboard.quickActions')}</h3>
                             <div className="flex overflow-x-auto snap-x snap-mandatory gap-3 md:grid md:grid-cols-2 md:gap-4 h-full pb-2 md:pb-0 -mx-5 px-5 md:mx-0 md:px-0 scrollbar-hide">
-                                <button onClick={() => setIsScannerOpen(true)} className="min-w-[280px] md:min-w-0 md:col-span-2 snap-center flex flex-row items-center justify-between px-6 py-4 rounded-[2rem] bg-gradient-to-r from-gold-500 to-gold-400 text-white shadow-xl shadow-gold-500/20 transition-all hover:scale-[1.02] active:scale-95 group/btn relative overflow-hidden">
+                                <button onClick={() => setIsScannerOpen(true)} className="min-w-[220px] md:min-w-0 md:col-span-2 snap-center flex flex-row items-center justify-between px-6 py-4 rounded-[2rem] bg-gradient-to-r from-gold-500 to-gold-400 text-white shadow-xl shadow-gold-500/20 transition-all hover:scale-[1.02] active:scale-95 group/btn relative overflow-hidden">
                                     <div className="absolute inset-0 bg-white/20 translate-y-full group-hover/btn:translate-y-0 transition-transform duration-500 ease-out"></div>
                                     <div className="relative z-10 flex items-center gap-3">
                                         <div className="p-2 bg-white/20 rounded-full backdrop-blur-sm">
@@ -571,6 +572,14 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                                 <button onClick={() => setIsConverterOpen(true)} className="min-w-[100px] snap-center flex flex-col items-center justify-center gap-2 p-4 rounded-[2rem] bg-white dark:bg-neutral-800 border border-neutral-100 dark:border-neutral-700 text-neutral-900 dark:text-white transition-all hover:border-gold-500/50 hover:shadow-lg active:scale-95 group/btn hover:bg-neutral-50 dark:hover:bg-neutral-750">
                                     <RefreshCw size={24} strokeWidth={2} className="group-hover/btn:text-gold-500 transition-colors" />
                                     <span className="text-[10px] font-bold uppercase tracking-wide">{t('dashboard.currency') || 'Convert'}</span>
+                                </button>
+                                <button onClick={() => onNavigate && onNavigate('reports')} className="min-w-[100px] snap-center flex flex-col items-center justify-center gap-2 p-4 rounded-[2rem] bg-white dark:bg-neutral-800 border border-neutral-100 dark:border-neutral-700 text-neutral-900 dark:text-white transition-all hover:border-gold-500/50 hover:shadow-lg active:scale-95 group/btn hover:bg-neutral-50 dark:hover:bg-neutral-750">
+                                    <FileText size={24} strokeWidth={2} className="group-hover/btn:text-gold-500 transition-colors" />
+                                    <span className="text-[10px] font-bold uppercase tracking-wide">{t('nav.reports')}</span>
+                                </button>
+                                <button onClick={() => onNavigate && onNavigate('investments')} className="min-w-[100px] snap-center flex flex-col items-center justify-center gap-2 p-4 rounded-[2rem] bg-white dark:bg-neutral-800 border border-neutral-100 dark:border-neutral-700 text-neutral-900 dark:text-white transition-all hover:border-gold-500/50 hover:shadow-lg active:scale-95 group/btn hover:bg-neutral-50 dark:hover:bg-neutral-750">
+                                    <TrendingUp size={24} strokeWidth={2} className="group-hover/btn:text-gold-500 transition-colors" />
+                                    <span className="text-[10px] font-bold uppercase tracking-wide">{t('nav.investments')}</span>
                                 </button>
                             </div>
                         </div>

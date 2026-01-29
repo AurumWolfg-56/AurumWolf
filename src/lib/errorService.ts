@@ -1,3 +1,5 @@
+import { supabase } from './supabase';
+
 type ErrorSeverity = 'info' | 'warn' | 'error' | 'fatal';
 
 interface ErrorContext {
@@ -40,7 +42,26 @@ class ErrorServiceImpl {
             console.log('[ErrorService]', JSON.stringify(payload));
         }
 
-        // 3. TODO: Send to Sentry / Datadog
+        // 3. Send to Supabase (Fire & Forget)
+        const getUserId = async () => {
+            if (context.userId) return context.userId;
+            const { data } = await supabase.auth.getUser();
+            return data.user?.id;
+        };
+
+        getUserId().then(uid => {
+            supabase.from('error_logs').insert({
+                severity,
+                message,
+                context,
+                stack,
+                user_id: uid
+            }).then(({ error: dbError }) => {
+                if (dbError) console.error('[ErrorService] Failed to persist log:', dbError);
+            });
+        });
+
+        // 4. TODO: Send to Sentry / Datadog
         // if (process.env.NODE_ENV === 'production') { Sentry.captureException(error, { extra: context }); }
     }
 }

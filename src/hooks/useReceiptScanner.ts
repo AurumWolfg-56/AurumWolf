@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { Type } from "@google/genai";
 import { CURRENCIES, CATEGORIES } from '../constants';
+import { toast } from 'sonner';
 
 export interface ScannedReceiptData {
     amount?: number;
@@ -93,9 +94,9 @@ export const useReceiptScanner = ({ apiKey, onScanComplete }: UseReceiptScannerP
 
             // Handle Rate Limiting specifically
             if (msg.includes("429") || msg.includes("Quota") || msg.includes("limit")) {
-                alert("⏳ AI Traffic High (Rate Limit)\n\nGoogle's free AI service is busy. Please wait 30-60 seconds and try again.");
+                toast.warning("⏳ AI Traffic High (Rate Limit). Google's free AI service is busy. Please wait 30-60 seconds and try again.");
             } else {
-                alert("Error processing receipt: " + msg);
+                toast.error("Error processing receipt: " + msg);
             }
         } finally {
             setIsScanning(false);
