@@ -397,7 +397,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                 />
             )}
 
-            <div className="relative min-h-screen pb-20 md:pb-0">
+            <div className="relative">
                 {/* ... (backgrounds) ... */}
                 <div className="fixed inset-0 pointer-events-none">
                     <div className="absolute top-[-10%] right-[-5%] w-[600px] h-[600px] bg-gold-500/10 rounded-full blur-[120px] mix-blend-screen opacity-50 dark:opacity-20 animate-pulse-slow"></div>

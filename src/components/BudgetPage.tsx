@@ -126,7 +126,7 @@ export const BudgetPage: React.FC<BudgetPageProps> = ({
     };
 
     return (
-        <div className="animate-fade-in space-y-8 pb-20 md:pb-0">
+        <div className="animate-fade-in space-y-8">
 
             {/* --- HEADER STATS (Only in Dashboard) --- */}
             {viewMode === 'dashboard' && (

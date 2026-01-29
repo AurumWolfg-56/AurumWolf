@@ -236,7 +236,7 @@ export const InvestmentsPage: React.FC<InvestmentsPageProps> = ({
     };
 
     return (
-        <div className="animate-fade-in space-y-8 pb-24 md:pb-0 font-sans">
+        <div className="animate-fade-in space-y-8 font-sans">
 
 
             {/* --- HEADER --- */}

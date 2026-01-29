@@ -151,7 +151,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
     }
 
     return (
-        <div className="animate-fade-in space-y-8 pb-24 md:pb-0">
+        <div className="animate-fade-in space-y-8">
             {renderPreview()}
 
             {/* Hero Header */}

@@ -240,7 +240,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
    const currentCurrency = CURRENCIES.find(c => c.code === baseCurrency);
 
    return (
-      <div className="max-w-3xl mx-auto pb-20 md:pb-0 animate-fade-in">
+      <div className="max-w-3xl mx-auto animate-fade-in">
          {/* --- PROFILE HEADER --- */}
          <div className="flex flex-col md:flex-row items-center gap-6 p-8 mb-8 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-3xl relative overflow-hidden transition-colors duration-300">
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-gold-400 via-gold-500 to-gold-600"></div>

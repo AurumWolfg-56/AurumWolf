@@ -219,7 +219,7 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({
     };
 
     return (
-        <div className="animate-fade-in space-y-6 pb-24 md:pb-0 relative">
+        <div className="animate-fade-in space-y-6 relative">
 
             {/* --- DESKTOP HEADER & CONTROLS --- */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 glass-card p-2 rounded-2xl shadow-sm dark:shadow-none sticky top-20 md:top-0 z-20">

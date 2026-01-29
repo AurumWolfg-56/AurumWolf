@@ -113,7 +113,7 @@ export const BusinessPage: React.FC<BusinessPageProps> = ({ searchQuery = '', ba
         const profit = revenue - expenses;
 
         return (
-            <div className="animate-fade-in space-y-6 pb-20 md:pb-0">
+            <div className="animate-fade-in space-y-6">
                 {/* Back & Header */}
                 <div className="flex items-center gap-4">
                     <button
@@ -253,7 +253,7 @@ export const BusinessPage: React.FC<BusinessPageProps> = ({ searchQuery = '', ba
     // --- PORTFOLIO DASHBOARD RENDER ---
 
     return (
-        <div className="animate-fade-in space-y-8 pb-20 md:pb-0">
+        <div className="animate-fade-in space-y-8">
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>

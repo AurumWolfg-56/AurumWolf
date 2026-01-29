@@ -442,7 +442,7 @@ export const AccountsPage: React.FC<AccountsPageProps> = ({
     }
 
     return (
-        <div className="animate-fade-in space-y-6 pb-20 md:pb-0">
+        <div className="animate-fade-in space-y-6">
 
             {/* Overview Header */}
             <div className="glass-card rounded-3xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm dark:shadow-none">
