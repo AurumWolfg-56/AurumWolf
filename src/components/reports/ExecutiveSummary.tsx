@@ -63,7 +63,7 @@ export const ExecutiveSummary: React.FC<{ snapshot: ReportSnapshot }> = ({ snaps
     const s = snapshot.summary;
 
     return (
-        <div className="mb-10 print:mb-4 relative z-10 page-break-inside-avoid">
+        <div className="mb-10 print:mb-2 relative z-10 page-break-inside-avoid">
             <div className="flex justify-between items-center border-b border-neutral-200 pb-2 mb-6 print:mb-2">
                 <h2 className="text-sm font-bold text-neutral-900 uppercase tracking-wider flex items-center gap-2">
                     <Activity size={16} className="text-gold-500" /> Executive Summary

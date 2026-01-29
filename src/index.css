@@ -232,6 +232,12 @@
     -webkit-overflow-scrolling: touch;
   }
 
+  /* Anti-Flicker Shield: Hides app content during resuming/locking state transitions */
+  body.app-paused #root {
+    opacity: 0;
+    pointer-events: none;
+  }
+
   /* ============================================
      CUSTOM SCROLLBAR FOR SPECIFIC CONTAINERS
      ============================================ */

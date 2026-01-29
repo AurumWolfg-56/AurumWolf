@@ -234,22 +234,36 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         setIsAuthenticated(true);
     };
 
+    // --- VISUAL REGRESSION SHIELD ---
+    const toggleAppPause = (paused: boolean) => {
+        if (paused) document.body.classList.add('app-paused');
+        else {
+            // Small delay to allow React to render the Lock Screen frame
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    document.body.classList.remove('app-paused');
+                });
+            });
+        }
+    };
+
+    // Ensure app is visible when lock state changes (e.g. after mounting Lock Screen)
+    useEffect(() => {
+        // Force reveal when lock state settles
+        const t = setTimeout(() => document.body.classList.remove('app-paused'), 150);
+        return () => clearTimeout(t);
+    }, [isLocked]);
+
     // --- CRITICAL: AUTO-LOCK WITH SCANNER PROTECTION ---
     useEffect(() => {
         if (!hasPin) return;
 
         const enforceLock = () => {
             // Double-check bypass synchronously - critical for preventing flicker
-            if (bypassRef.current === true) {
-                console.log("Security: Lock bypassed for active operation");
-                return;
-            }
+            if (bypassRef.current === true) return;
 
             // Also check for active scanner
-            if (document.querySelector('.scanner-container')) {
-                console.log("Security: Lock bypassed - scanner active");
-                return;
-            }
+            if (document.querySelector('.scanner-container')) return;
 
             console.log("Security Event: Locking app");
             lock();
@@ -258,36 +272,46 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
 
         const reEntryCheck = () => {
             if (bypassRef.current) return;
-            // Also check for active scanner
             if (document.querySelector('.scanner-container')) return;
 
             const now = Date.now();
             const lastActive = parseInt(localStorage.getItem('aurum_last_active') || '0');
 
             if (document.visibilityState === 'visible') {
-                if (lastActive > 0 && now - lastActive > 5000) { // Increased to 5s
+                // RESUMING
+                if (lastActive > 0 && now - lastActive > 5000) {
+                    // Should Lock
                     enforceLock();
+                    // Don't unpause here; let the isLocked effect handle it
+                } else {
+                    // Safe to reveal
+                    toggleAppPause(false);
                 }
                 localStorage.setItem('aurum_last_active', now.toString());
             } else {
+                // HIDING
                 // Only lock on visibility hidden if no active operations
                 if (!bypassRef.current && !document.querySelector('.scanner-container')) {
+                    toggleAppPause(true); // Hide immediately
                     enforceLock();
                 }
             }
         };
 
-        // Less aggressive event coverage - removed blur for mobile compatibility
+        const handlePageHide = () => {
+            toggleAppPause(true);
+            enforceLock();
+        };
+
         document.addEventListener("visibilitychange", reEntryCheck);
-        window.addEventListener("pagehide", enforceLock);
-        // Removed: window.addEventListener("blur", enforceLock); - causes flicker on mobile file picker
-        window.addEventListener("beforeunload", enforceLock);
+        window.addEventListener("pagehide", handlePageHide);
+        window.addEventListener("beforeunload", handlePageHide);
         window.addEventListener("focus", reEntryCheck);
 
         return () => {
             document.removeEventListener("visibilitychange", reEntryCheck);
-            window.removeEventListener("pagehide", enforceLock);
-            window.removeEventListener("beforeunload", enforceLock);
+            window.removeEventListener("pagehide", handlePageHide);
+            window.removeEventListener("beforeunload", handlePageHide);
             window.removeEventListener("focus", reEntryCheck);
         };
     }, [hasPin]);

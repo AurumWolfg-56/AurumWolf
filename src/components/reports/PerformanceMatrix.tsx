@@ -34,7 +34,7 @@ export const PerformanceMatrix: React.FC<{ snapshot: ReportSnapshot }> = ({ snap
     const b = snapshot.business;
 
     return (
-        <div className="mb-10 print:mb-4 relative z-10 page-break-inside-avoid">
+        <div className="mb-10 print:mb-2 relative z-10 page-break-inside-avoid">
             <h2 className="text-sm font-bold text-neutral-900 uppercase tracking-wider border-b border-neutral-200 pb-2 mb-6 print:mb-2 flex items-center gap-2">
                 <CheckCircle2 size={16} className="text-gold-500" /> Performance Matrix
             </h2>
