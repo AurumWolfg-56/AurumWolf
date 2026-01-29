@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en" class="dark no-flicker">
 
 <head>
   <meta charset="UTF-8" />
@@ -83,6 +83,13 @@
 </head>
 
 <body>
+  <script>
+    // SYNCHRONOUS ANTI-FLICKER SHIELD
+    // We apply this BEFORE React loads so there is 0ms of Dashboard visibility
+    if (localStorage.getItem('aurum_security_pin') || localStorage.getItem('aurum_security_timeout')) {
+      document.body.classList.add('app-paused');
+    }
+  </script>
   <div id="root"></div>
   <script type="module" src="./src/index.tsx"></script>
 </body>

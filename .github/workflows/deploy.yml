@@ -40,11 +40,11 @@ jobs:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          local-dir: ./dist/
-          server-dir: ./
+          local-dir: dist
+          server-dir: /
           port: 21
           protocol: ftps
           security: loose
-          timeout: 300000
+          timeout: 600000
           log-level: verbose
 
