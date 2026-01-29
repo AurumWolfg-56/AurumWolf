@@ -60,6 +60,8 @@ export function LoginPage({ t }: LoginPageProps) {
         }
     };
 
+    const { loginWithBiometrics } = useSecurity(); // Destructure properly
+
     const handleBiometricLogin = async () => {
         if (!email) {
             setError("Please enter your email to sign in with biometrics.");
@@ -68,9 +70,9 @@ export function LoginPage({ t }: LoginPageProps) {
         setLoading(true);
         setError(null);
         try {
-            const { error } = await (supabase.auth as any).signInWithWebAuthn({ email });
-            if (error) throw error;
-            // Successful login will trigger AuthContext state change automatically
+            await loginWithBiometrics(email);
+            setMessage("Login successful. Resuming session...");
+            // AuthContext handles redirect
         } catch (e: any) {
             console.error(e);
             setError(e.message || "Biometric login failed. Make sure you have setup biometrics in Settings.");

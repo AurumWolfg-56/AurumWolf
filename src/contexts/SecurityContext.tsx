@@ -13,6 +13,7 @@ interface SecurityContextType {
     toggleBiometrics: (enabled: boolean) => Promise<void>;
     removePin: () => void;
     verifyBiometrics: () => Promise<boolean>;
+    loginWithBiometrics: (email: string) => Promise<void>;
     lastBiometricError: string | null;
     isSecurityBypassed: boolean;
     setSecurityBypass: (enabled: boolean) => void;
@@ -24,6 +25,7 @@ const STORAGE_KEYS = {
     PIN_HASH: 'aurum_security_pin',
     BIOMETRICS_ENABLED: 'aurum_security_bio',
     CREDENTIAL_ID: 'aurum_security_cred_id',
+    VAULT: 'aurum_vault_data',
     LOCK_TIMEOUT: 'aurum_security_timeout'
 };
 
@@ -125,8 +127,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
 
             if (assertion) {
                 console.log("Biometrics: Verification successful");
-                setIsAuthenticated(true);
-                setIsLocked(false);
+                // Do NOT set isAuthenticated here blindly, as we might be using this for login
                 setLastBiometricError(null);
                 setSecurityBypass(false);
                 return true;
@@ -135,34 +136,67 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             console.error("Biometrics: Verification failed", error);
             setLastBiometricError(error.name === 'NotAllowedError' ? 'Canceled' : 'Hardware Error');
         } finally {
-            // Longer delay to ensure window regains focus and avoid flicker
-            setTimeout(() => setSecurityBypass(false), 3000);
+            setTimeout(() => setSecurityBypass(false), 1000);
         }
         return false;
+    };
+
+    const loginWithBiometrics = async (email: string) => {
+        const verified = await verifyBiometrics();
+        if (!verified) throw new Error("Biometric verification failed");
+
+        const vault = localStorage.getItem(STORAGE_KEYS.VAULT);
+        if (!vault) throw new Error("No secure credentials found. Please toggle Biometrics off and on in Settings to reset.");
+
+        try {
+            const password = atob(vault); // Simple de-obfuscation
+            const { error } = await supabase.auth.signInWithPassword({
+                email,
+                password
+            });
+            if (error) throw error;
+            setIsAuthenticated(true);
+            setIsLocked(false);
+        } catch (e: any) {
+            console.error("Login failed:", e);
+            throw new Error(e.message || "Failed to sign in with stored credentials");
+        }
     };
 
     const toggleBiometrics = async (enabled: boolean) => {
         if (enabled) {
             if (!window.isSecureContext) {
-                console.error("Biometrics: Not an HTTPS context");
                 alert("La seguridad biométrica requiere una conexión HTTPS segura.");
                 return;
             }
 
+            // Prompt for password to store in vault
+            const password = window.prompt("Para habilitar el inicio de sesión biométrico, ingresa tu contraseña actual:");
+            if (!password) return;
+
             try {
-                setSecurityBypass(true); // CRITICAL: Stop auto-lock from killing setup
-                console.log("Biometrics: Starting Supabase Passkey Enrollment...");
+                setSecurityBypass(true);
+                console.log("Biometrics: Starting enrollment...");
 
-                // Supabase MFA/Passkey Enrollment
-                const { data, error } = await supabase.auth.mfa.enroll({
-                    factorType: 'webauthn',
-                });
+                // Create local credential to verify device ownership
+                const credential = await navigator.credentials.create({
+                    publicKey: {
+                        challenge: getChallenge(),
+                        rp: { name: "AurumWolf", id: window.location.hostname },
+                        user: {
+                            id: crypto.getRandomValues(new Uint8Array(16)),
+                            name: "user@aurumwolf.app",
+                            displayName: "AurumWolf User"
+                        },
+                        pubKeyCredParams: [{ alg: -7, type: "public-key" }, { alg: -257, type: "public-key" }],
+                        authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required" },
+                        timeout: 60000
+                    }
+                }) as PublicKeyCredential;
 
-                if (error) throw error;
-
-                if (data) {
-                    console.log("Biometrics: Passkey Enrolled", data);
-                    localStorage.setItem(STORAGE_KEYS.CREDENTIAL_ID, data.id); // Save Factor ID
+                if (credential) {
+                    localStorage.setItem(STORAGE_KEYS.CREDENTIAL_ID, credential.id);
+                    localStorage.setItem(STORAGE_KEYS.VAULT, btoa(password)); // Store obfuscated password
                     setBiometricsEnabled(true);
                     localStorage.setItem(STORAGE_KEYS.BIOMETRICS_ENABLED, 'true');
                     alert("¡Biometría vinculada correctamente!");
@@ -170,25 +204,17 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             } catch (e: any) {
                 console.error("Biometrics: Setup failed", e);
                 const msg = e.name === 'NotAllowedError' ? 'Operación cancelada.' : e.message;
-                alert(`Error al activar: ${msg} (Asegúrate de tener WebAuthn habilitado en Supabase)`);
+                alert(`Error al activar: ${msg}`);
                 setLastBiometricError(e.message);
                 setBiometricsEnabled(false);
             } finally {
-                setTimeout(() => setSecurityBypass(false), 3000);
+                setTimeout(() => setSecurityBypass(false), 1000);
             }
         } else {
-            // Disable / Unenroll
-            const factorId = localStorage.getItem(STORAGE_KEYS.CREDENTIAL_ID);
-            if (factorId) {
-                try {
-                    await supabase.auth.mfa.unenroll({ factorId });
-                } catch (err) {
-                    console.warn("Failed to unenroll on server, disabling locally", err);
-                }
-            }
             setBiometricsEnabled(false);
             localStorage.setItem(STORAGE_KEYS.BIOMETRICS_ENABLED, 'false');
             localStorage.removeItem(STORAGE_KEYS.CREDENTIAL_ID);
+            localStorage.removeItem(STORAGE_KEYS.VAULT);
             console.log("Biometrics: Disabled");
         }
     };
@@ -233,6 +259,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             toggleBiometrics,
             removePin,
             verifyBiometrics,
+            loginWithBiometrics,
             lastBiometricError,
             isSecurityBypassed,
             setSecurityBypass
