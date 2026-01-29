@@ -43,8 +43,8 @@ jobs:
           local-dir: dist/
           server-dir: public_html/
           port: 21
-          protocol: ftps
-          security: strict
+          protocol: ftp
+          security: loose
           timeout: 600000
           log-level: verbose
 
