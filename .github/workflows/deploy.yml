@@ -34,17 +34,9 @@ jobs:
       - name: 🔍 Debug Build Output
         run: ls -R dist
 
-      - name: 📂 Sync files (FTP)
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
-        with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          local-dir: dist/
-          server-dir: public_html/
-          port: 21
-          protocol: ftp
-          security: loose
-          timeout: 600000
-          log-level: verbose
+      - name: 📂 Sync files (lftp)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lftp
+          lftp -c "set ftp:ssl-allow yes; set ssl:verify-certificate no; open -u ${{ secrets.FTP_USERNAME }},${{ secrets.FTP_PASSWORD }} ${{ secrets.FTP_SERVER }}; mirror --reverse --delete --verbose --parallel=2 dist/ public_html/"
 
