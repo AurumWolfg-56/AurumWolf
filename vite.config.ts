@@ -9,6 +9,12 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      workbox: {
+        cleanupOutdatedCaches: true,
+        sourcemap: true,
+        clientsClaim: true,
+        skipWaiting: true
+      },
       manifest: {
         name: 'AurumWolf Finance',
         short_name: 'AurumWolf',
