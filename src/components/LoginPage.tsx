@@ -61,20 +61,19 @@ export function LoginPage({ t }: LoginPageProps) {
     };
 
     const handleBiometricLogin = async () => {
+        if (!email) {
+            setError("Please enter your email to sign in with biometrics.");
+            return;
+        }
         setLoading(true);
         setError(null);
         try {
-            const verified = await verifyBiometrics();
-            if (verified) {
-                // NOTE: Biometrics confirm local identity but do NOT retrieve Supabase session key.
-                // In a production app with Passkeys, this would retrieve the token.
-                // For now, we flag it as verified.
-                setMessage("Identity Confirmed. Please enter password to resume secure session.");
-            } else {
-                setError("Biometric verification failed.");
-            }
-        } catch (e) {
-            setError("Biometric error.");
+            const { error } = await (supabase.auth as any).signInWithWebAuthn({ email });
+            if (error) throw error;
+            // Successful login will trigger AuthContext state change automatically
+        } catch (e: any) {
+            console.error(e);
+            setError(e.message || "Biometric login failed. Make sure you have setup biometrics in Settings.");
         } finally {
             setLoading(false);
         }

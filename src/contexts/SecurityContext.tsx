@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { supabase } from '../lib/supabase';
 
 interface SecurityContextType {
     isLocked: boolean;
@@ -150,51 +151,41 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
 
             try {
                 setSecurityBypass(true); // CRITICAL: Stop auto-lock from killing setup
-                console.log("Biometrics: Starting enrollment for RP:", window.location.hostname);
+                console.log("Biometrics: Starting Supabase Passkey Enrollment...");
 
-                const credential = await navigator.credentials.create({
-                    publicKey: {
-                        challenge: getChallenge(),
-                        rp: {
-                            name: "AurumWolf",
-                            id: window.location.hostname
-                        },
-                        user: {
-                            id: crypto.getRandomValues(new Uint8Array(16)),
-                            name: "user@aurumwolf.app",
-                            displayName: "AurumWolf Member"
-                        },
-                        pubKeyCredParams: [
-                            { alg: -7, type: "public-key" }, // ES256 (Common)
-                            { alg: -257, type: "public-key" } // RS256 (Older fallback)
-                        ],
-                        authenticatorSelection: {
-                            authenticatorAttachment: "platform",
-                            userVerification: "required",
-                            residentKey: "discouraged"
-                        },
-                        timeout: 60000,
-                    }
-                }) as PublicKeyCredential;
+                // Supabase MFA/Passkey Enrollment
+                const { data, error } = await supabase.auth.mfa.enroll({
+                    factorType: 'webauthn',
+                });
 
-                if (credential) {
-                    localStorage.setItem(STORAGE_KEYS.CREDENTIAL_ID, credential.id);
+                if (error) throw error;
+
+                if (data) {
+                    console.log("Biometrics: Passkey Enrolled", data);
+                    localStorage.setItem(STORAGE_KEYS.CREDENTIAL_ID, data.id); // Save Factor ID
                     setBiometricsEnabled(true);
                     localStorage.setItem(STORAGE_KEYS.BIOMETRICS_ENABLED, 'true');
-                    console.log("Biometrics: Setup complete");
-                    alert("¡Huella/Rostro vinculado correctamente!");
+                    alert("¡Biometría vinculada correctamente!");
                 }
             } catch (e: any) {
                 console.error("Biometrics: Setup failed", e);
-                // Help user understand why it failed
-                const msg = e.name === 'NotAllowedError' ? 'Operación cancelada o tiempo agotado.' : `Error: ${e.message}`;
-                alert(`No se pudo activar: ${msg}`);
+                const msg = e.name === 'NotAllowedError' ? 'Operación cancelada.' : e.message;
+                alert(`Error al activar: ${msg} (Asegúrate de tener WebAuthn habilitado en Supabase)`);
                 setLastBiometricError(e.message);
+                setBiometricsEnabled(false);
             } finally {
-                // Longer delay to prevent flicker during enrollment
                 setTimeout(() => setSecurityBypass(false), 3000);
             }
         } else {
+            // Disable / Unenroll
+            const factorId = localStorage.getItem(STORAGE_KEYS.CREDENTIAL_ID);
+            if (factorId) {
+                try {
+                    await supabase.auth.mfa.unenroll({ factorId });
+                } catch (err) {
+                    console.warn("Failed to unenroll on server, disabling locally", err);
+                }
+            }
             setBiometricsEnabled(false);
             localStorage.setItem(STORAGE_KEYS.BIOMETRICS_ENABLED, 'false');
             localStorage.removeItem(STORAGE_KEYS.CREDENTIAL_ID);
