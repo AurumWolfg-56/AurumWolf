@@ -154,11 +154,25 @@ export const TransactionsProvider = ({ children }: { children: ReactNode }) => {
     if (!user) return false;
 
     try {
-      const { error } = await supabase.from('transactions').delete().eq('id', id);
+      // Use Atomic RPC to revert balances
+      const { data, error } = await supabase.rpc('delete_transaction_v2', {
+        p_transaction_id: id,
+        p_user_id: user.id
+      });
+
       if (error) throw error;
+
+      // If RPC returned true, it means deletion was successful
+      // If false, it might not have existed or belonged to user
+      if (data === false) {
+        console.warn("Transaction not found or access denied");
+        return false;
+      }
+
       return true;
     } catch (err) {
       console.error("Error deleting transaction:", err);
+      // Revert optimism if failed
       setTransactions(prevTransactions);
       return false;
     }

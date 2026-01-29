@@ -84,33 +84,15 @@ export const useTransactionOperations = ({
     }, [accounts, transactions, updateAccount, refreshAccounts, refreshTransactions]);
 
     const handleDeleteTransaction = useCallback(async (id: string) => {
-        const tx = transactions.find(t => t.id === id);
-        if (!tx) return;
+        // Atomic RPC (delete_transaction_v2) handles:
+        // 1. Reverting balance (Expense/Income)
+        // 2. Finding and reverting/deleting linked transfer (if any)
 
-        // Check for linked transfer
-        const linkId = tx.transfer_link_id;
+        await deleteTransaction(id);
 
-        let idsToDelete = [id];
-        if (linkId) {
-            // Find the partner
-            const partner = transactions.find(t => t.transfer_link_id === linkId && t.id !== id);
-            if (partner) {
-                // TODO: Replace with better UI confirmation in future phase
-                if (confirm("This is part of a transfer. Delete the other side as well?")) {
-                    idsToDelete.push(partner.id);
-                }
-            }
-        }
-
-        for (const tid of idsToDelete) {
-            await deleteTransaction(tid);
-        }
-
-        // Final balance update logic...
-        // Refresh state instead of full reload
+        // Refresh state to reflect changes (including partner deletion if it was a transfer)
         await Promise.all([refreshAccounts(), refreshTransactions()]);
-
-    }, [transactions, accounts, deleteTransaction, updateAccount, refreshAccounts, refreshTransactions]);
+    }, [deleteTransaction, refreshAccounts, refreshTransactions]);
 
     return {
         handleTransfer,
