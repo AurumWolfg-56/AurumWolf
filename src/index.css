@@ -232,10 +232,22 @@
     -webkit-overflow-scrolling: touch;
   }
 
-  /* Anti-Flicker Shield: Hides app content during resuming/locking state transitions */
-  body.app-paused #root {
-    opacity: 0;
-    pointer-events: none;
+  /* Anti-Flicker Shield: Hides app content during resuming/locking state transitions
+     Uses a solid overlay to match the dark theme, preventing white/black flashes.
+  */
+  body.app-paused::after {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #0a0a0a;
+    /* neutral-950 */
+    z-index: 99999;
+    opacity: 1;
+    pointer-events: all;
+    transition: opacity 0.2s ease-out;
   }
 
   /* ============================================

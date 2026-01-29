@@ -303,16 +303,40 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             enforceLock();
         };
 
+        // --- BLUR DETECTION (For quicker "Leaving" detection) ---
+        const blurTimeoutRef = { current: null as any };
+
+        const handleBlur = () => {
+            if (bypassRef.current || document.querySelector('.scanner-container')) return;
+
+            // Debounce to avoid flickering on file pickers/system dialogs
+            blurTimeoutRef.current = setTimeout(() => {
+                toggleAppPause(true);
+                // We don't necessarily forceful lock on blur, but we hide content
+                // enforceLock(); // Optional: stick to visibility hidden for locking
+            }, 200);
+        };
+
+        const handleFocus = () => {
+            if (blurTimeoutRef.current) {
+                clearTimeout(blurTimeoutRef.current);
+                blurTimeoutRef.current = null;
+            }
+            reEntryCheck();
+        };
+
         document.addEventListener("visibilitychange", reEntryCheck);
         window.addEventListener("pagehide", handlePageHide);
         window.addEventListener("beforeunload", handlePageHide);
-        window.addEventListener("focus", reEntryCheck);
+        window.addEventListener("blur", handleBlur);
+        window.addEventListener("focus", handleFocus);
 
         return () => {
             document.removeEventListener("visibilitychange", reEntryCheck);
             window.removeEventListener("pagehide", handlePageHide);
             window.removeEventListener("beforeunload", handlePageHide);
-            window.removeEventListener("focus", reEntryCheck);
+            window.removeEventListener("blur", handleBlur);
+            window.removeEventListener("focus", handleFocus);
         };
     }, [hasPin]);
 
