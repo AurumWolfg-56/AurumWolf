@@ -15,6 +15,7 @@ const BudgetPage = lazyWithRetry(() => import('./components/BudgetPage').then(m 
 const BusinessPage = lazyWithRetry(() => import('./components/BusinessPage').then(m => ({ default: m.BusinessPage })));
 import { useBusiness } from './contexts/BusinessContext';
 const InvestmentsPage = lazyWithRetry(() => import('./components/InvestmentsPage').then(m => ({ default: m.InvestmentsPage })));
+const CashFlowPage = lazyWithRetry(() => import('./components/cashflow/CashFlowPage').then(m => ({ default: m.CashFlowPage })));
 const ReportsPage = lazyWithRetry(() => import('./components/ReportsPage').then(m => ({ default: m.ReportsPage })));
 const SettingsPage = lazyWithRetry(() => import('./components/SettingsPage').then(m => ({ default: m.SettingsPage })));
 const ScanPage = lazyWithRetry(() => import('./components/ScanPage').then(m => ({ default: m.ScanPage })));
@@ -384,6 +385,12 @@ export default function App() {
                 return <InvestmentsPage
                     baseCurrency={baseCurrency}
                     t={t}
+                />;
+            case 'cashflow':
+                return <CashFlowPage
+                    baseCurrency={baseCurrency}
+                    t={t}
+                    language={language}
                 />;
             case 'reports':
                 return <ReportsPage

@@ -9,6 +9,7 @@ import { BudgetsProvider } from './contexts/BudgetsContext';
 import { InvestmentsProvider } from './contexts/InvestmentsContext';
 import { BusinessProvider } from './contexts/BusinessContext';
 import { CategoryProvider } from './contexts/CategoryContext';
+import { CashFlowProvider } from './contexts/CashFlowContext';
 
 const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
 root.render(
@@ -18,11 +19,13 @@ root.render(
         <TransactionsProvider>
           <BusinessProvider>
             <InvestmentsProvider>
-              <CategoryProvider>
-                <BudgetsProvider>
-                  <App />
-                </BudgetsProvider>
-              </CategoryProvider>
+              <CashFlowProvider>
+                <CategoryProvider>
+                  <BudgetsProvider>
+                    <App />
+                  </BudgetsProvider>
+                </CategoryProvider>
+              </CashFlowProvider>
             </InvestmentsProvider>
           </BusinessProvider>
         </TransactionsProvider>

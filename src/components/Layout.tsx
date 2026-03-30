@@ -97,6 +97,7 @@ export const Layout: React.FC<LayoutProps> = ({
       case 'accounts': return t('titles.accountsAssets');
       case 'budget': return t('titles.financialPlan');
       case 'investments': return t('titles.investmentPortfolio');
+      case 'cashflow': return t('titles.cashFlow');
       case 'reports': return t('titles.reports');
       default: return '';
     }

@@ -1,5 +1,5 @@
 
-export type NavTab = 'home' | 'accounts' | 'budget' | 'scan' | 'transactions' | 'business' | 'investments' | 'reports' | 'settings';
+export type NavTab = 'home' | 'accounts' | 'budget' | 'scan' | 'transactions' | 'business' | 'investments' | 'cashflow' | 'reports' | 'settings';
 export type Language = 'en' | 'es';
 
 export interface UserProfile {
@@ -207,4 +207,112 @@ export interface ChartDataPoint {
   formattedValue: string;
   displayIncome: string;
   displayExpense: string;
+}
+
+// --- CASH FLOW TYPES ---
+
+export type AssetClassification = 'productive' | 'defensive' | 'consumption' | 'intangible';
+
+export type AssetCategory =
+  | 'liquid_cash'
+  | 'liquid_bank_account'
+  | 'liquid_savings'
+  | 'financial_long_term'
+  | 'financial_investment'
+  | 'real_housing'
+  | 'real_property'
+  | 'real_vehicle'
+  | 'real_equipment'
+  | 'real_jewelry'
+  | 'business_equity'
+  | 'business_inventory'
+  | 'business_machinery'
+  | 'business_other'
+  | 'other_convertible';
+
+export type AssetType = 'liquid' | 'financial' | 'real_physical' | 'business' | 'other';
+
+export interface PersonalAsset {
+  id: string;
+  name: string;
+  type: AssetType;
+  category: AssetCategory;
+  classification: AssetClassification;
+  estimatedValue: number;
+  currency: string;
+  acquisitionDate?: string;
+  monthlyIncome?: number;
+  depreciationRateAnnual?: number;
+  notes?: string;
+  linkedAccountId?: string;
+  lastValuationDate?: string;
+}
+
+export type LiabilityType =
+  | 'credit_card'
+  | 'personal_loan'
+  | 'auto_loan'
+  | 'mortgage'
+  | 'family_debt'
+  | 'legal_obligation'
+  | 'contractual'
+  | 'student_loan'
+  | 'medical_debt'
+  | 'tax_debt'
+  | 'other';
+
+export type ExpenseClassification =
+  | 'fixed'
+  | 'variable'
+  | 'semi_fixed'
+  | 'operational'
+  | 'non_operational'
+  | 'unnecessary'
+  | 'discretionary';
+
+export interface PersonalLiability {
+  id: string;
+  name: string;
+  type: LiabilityType;
+  expenseClass: ExpenseClassification;
+  currentBalance: number;
+  monthlyPayment: number;
+  interestRate: number;
+  remainingTermMonths: number;
+  hasCollateral: boolean;
+  collateralDescription?: string;
+  currency: string;
+  startDate?: string;
+  notes?: string;
+}
+
+export interface CashFlowMetrics {
+  totalAssets: number;
+  totalLiabilities: number;
+  netWorth: number;
+
+  liquidAssets: number;
+  financialAssets: number;
+  realAssets: number;
+  businessAssets: number;
+  otherAssets: number;
+
+  productiveAssets: number;
+  defensiveAssets: number;
+  consumptionAssets: number;
+  intangibleAssets: number;
+
+  monthlyNetIncome: number;
+  monthlyTotalExpenses: number;
+  monthlyCashFlow: number;
+  monthlyUtility: number;
+  monthlySavingsInvestment: number;
+  monthlyDebtPayments: number;
+
+  savingsRate: number;
+  savingsRateStatus: 'alarm' | 'solid' | 'acceleration';
+  dti: number;
+  dtiStatus: 'high_pressure' | 'acceptable' | 'room';
+  liquidityMonths: number;
+  liquidityStatus: 'critical' | 'high_risk' | 'healthy' | 'solid' | 'ultra_defensive';
 }

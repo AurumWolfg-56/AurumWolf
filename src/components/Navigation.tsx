@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Home, PieChart, Plus, Briefcase, Settings, LogOut, Wallet, History, X, ScanLine, TrendingUp, Menu, FileText, Eye, EyeOff } from 'lucide-react';
+import { Home, PieChart, Plus, Briefcase, Settings, LogOut, Wallet, History, X, ScanLine, TrendingUp, Menu, FileText, Eye, EyeOff, BarChart3 } from 'lucide-react';
 import { NavTab } from '../types';
 import { Logo } from './Logo';
 
@@ -43,6 +43,7 @@ export const Navigation: React.FC<NavigationProps> = ({
     { id: 'accounts', label: safeT('nav.accounts'), icon: Wallet },
     { id: 'budget', label: safeT('nav.budget'), icon: PieChart },
     { id: 'investments', label: safeT('nav.investments'), icon: TrendingUp },
+    { id: 'cashflow', label: safeT('nav.cashflow'), icon: BarChart3 },
     { id: 'business', label: safeT('nav.business'), icon: Briefcase },
     { id: 'reports', label: safeT('nav.reports'), icon: FileText },
     { id: 'settings', label: safeT('nav.settings'), icon: Settings },
