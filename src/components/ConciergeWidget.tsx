@@ -52,6 +52,7 @@ export const ConciergeWidget: React.FC<ConciergeWidgetProps> = ({ transactions, 
     ]);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
 
     // --- LIVE API REFS ---
@@ -103,8 +104,8 @@ export const ConciergeWidget: React.FC<ConciergeWidgetProps> = ({ transactions, 
     }, [activeTab, isOpen]);
 
     useEffect(() => {
-        if (isOpen && messagesEndRef.current) {
-            messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+        if (isOpen && scrollContainerRef.current) {
+            scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
         }
     }, [messages, isOpen]);
 
@@ -508,7 +509,7 @@ Otherwise, just answer their question naturally. Include the JSON at the END of 
             )}
 
             {/* --- TEXT MESSAGES AREA --- */}
-            <div className="flex-1 overflow-y-auto p-5 space-y-4 custom-scrollbar bg-platinum-50 dark:bg-neutral-900/95">
+            <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-5 space-y-4 custom-scrollbar bg-platinum-50 dark:bg-neutral-900/95">
                 {messages.map((msg) => (
                     <div key={msg.id} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
                         <div className={`w-8 h-8 rounded-full shrink-0 flex items-center justify-center border ${msg.role === 'user' ? 'bg-platinum-200 dark:bg-neutral-800 border-platinum-300 dark:border-neutral-700 text-neutral-600 dark:text-neutral-400' : 'bg-gold-500 text-neutral-950 border-gold-400'
