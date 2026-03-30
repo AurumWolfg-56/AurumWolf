@@ -11,9 +11,9 @@ import { Account, Transaction, RecurringFrequency, TransactionSplit } from '../t
 import { CURRENCIES } from '../constants';
 import { CategorySelect } from './CategorySelect';
 import { ReceiptReviewModal } from './ReceiptReviewModal';
-import { aiClient } from '../lib/ai/proxy';
-import { useCategories } from '../contexts/CategoryContext'; // Corrected import
-import { useBusiness } from '../contexts/BusinessContext'; // Needed for stores/channels
+import { useCategories } from '../contexts/CategoryContext';
+import { useBusiness } from '../contexts/BusinessContext';
+import { useAIInsights } from '../hooks/useAIInsights';
 import { useReceiptScanner, ScannedReceiptData } from '../hooks/useReceiptScanner';
 
 interface TransactionFormProps {
@@ -36,7 +36,8 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
   t
 }) => {
   const { categories } = useCategories();
-  const { entities: businessEntities } = useBusiness(); // Fetch entities for dropdown
+  const { entities: businessEntities } = useBusiness();
+  const { categorizeTransaction } = useAIInsights();
 
   // State Declarations (restoring what might have been lost or ensuring it exists)
   const [amount, setAmount] = useState(
@@ -110,47 +111,33 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
     setSuggestedCategory(null);
 
     try {
-      const response = await aiClient.generateContent(
-        'gemini-2.0-flash',
-        [{
-          role: 'user',
-          parts: [{ text: `Locate this merchant: "${merchant}". Return the official address, full business name, and a suggested transaction category from this list: ${categories.map(c => c.category).join(', ')}.` }]
-        }],
-        {
-          tools: [{ google_search_retrieval: { dynamic_retrieval_config: { mode: "MODE_DYNAMIC", dynamic_threshold: 0.3 } } }],
-        }
-      );
-
-      const text = response.text();
-      // Try to find grounding metadata for maps/links
-      const grounding = response.raw?.candidates?.[0]?.groundingMetadata;
-      const mapChunk = grounding?.searchEntryPoint; // Simplified access
-
-      // Attempt to extract category if model mentioned one
-      const matchedCategory = categories.find(c => text.includes(c.category));
-      if (matchedCategory && !category) {
-        setCategory(matchedCategory.category);
-        setSuggestedCategory(matchedCategory.category);
+      // AI-powered category suggestion
+      const suggested = await categorizeTransaction(merchant, numericRawAmount);
+      if (suggested && !category) {
+        setCategory(suggested);
+        setSuggestedCategory(suggested);
       }
 
-      // Check for Map Link (Grounding)
-      let mapUri = '';
-      if (grounding?.groundingChunks?.[0]?.web?.uri) {
-        mapUri = grounding.groundingChunks[0].web.uri;
-      }
-
-      if (text) {
-        // Using the text as address for now if structured data isn't parsed
-        const firstLine = text.split('\n')[0];
-        setLocationFound({ address: firstLine.substring(0, 50) + (firstLine.length > 50 ? '...' : ''), uri: mapUri || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(merchant)}` });
-      }
+      // Open Google Maps for location (no AI needed)
+      const mapUri = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(merchant)}`;
+      setLocationFound({ address: merchant, uri: mapUri });
 
     } catch (error) {
-      console.error("Enrichment failed", error);
+      console.error('Enrichment failed', error);
     } finally {
       setIsLocating(false);
     }
   };
+
+  // Auto-categorize when merchant name changes (with debounce)
+  useEffect(() => {
+    if (!merchant || merchant.length < 3 || category) return;
+    const timer = setTimeout(async () => {
+      const suggested = await categorizeTransaction(merchant);
+      if (suggested) setSuggestedCategory(suggested);
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [merchant, category, categorizeTransaction]);
 
   const calculateNextDate = (startDate: string, freq: RecurringFrequency): string => {
     const d = new Date(startDate);

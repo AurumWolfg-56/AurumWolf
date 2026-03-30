@@ -1,8 +1,8 @@
 
 import { useState } from 'react';
-import { Type } from "@google/genai";
 import { CURRENCIES, CATEGORIES } from '../constants';
 import { toast } from 'sonner';
+import { localAI, LocalAIError } from '../lib/ai/localAI';
 
 export interface ScannedReceiptData {
     amount?: number;
@@ -14,11 +14,10 @@ export interface ScannedReceiptData {
 }
 
 interface UseReceiptScannerProps {
-    apiKey?: string;
     onScanComplete?: (data: ScannedReceiptData) => void;
 }
 
-export const useReceiptScanner = ({ apiKey, onScanComplete }: UseReceiptScannerProps) => {
+export const useReceiptScanner = ({ onScanComplete }: UseReceiptScannerProps) => {
     const [isScanning, setIsScanning] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -27,76 +26,81 @@ export const useReceiptScanner = ({ apiKey, onScanComplete }: UseReceiptScannerP
         setError(null);
 
         try {
-            // 1. Resize Image to avoid Payload Limits (Max 1024px)
+            // 1. Check if LM Studio is available
+            const available = await localAI.isAvailable();
+            if (!available) {
+                throw new LocalAIError(
+                    'LM Studio is not running. Please start LM Studio and load the Qwen2.5 VL model to scan receipts.',
+                    'OFFLINE',
+                    false
+                );
+            }
+
+            // 2. Resize image to avoid huge payloads
             const resizedBase64 = await resizeImage(file, 1024);
 
-            // 2. Use Proxy Client
-            const { aiClient } = await import('../lib/ai/proxy');
+            // 3. Build the prompt
+            const categoryList = CATEGORIES.map(c => c.category).join(', ');
+            const prompt = `You are a receipt data extraction assistant. Analyze this receipt image carefully.
 
-            // 3. Call AI
-            const response = await aiClient.generateContent(
-                'gemini-2.0-flash',
-                [
-                    {
-                        role: 'user',
-                        parts: [
-                            { inlineData: { mimeType: 'image/jpeg', data: resizedBase64 } },
-                            {
-                                text: `Analyze this receipt image. Extract as many details as possible:
-                                - Total Amount (number only)
-                                - Currency Code (ISO format like USD, MXN)
-                                - Merchant Name
-                                - Date (YYYY-MM-DD)
-                                - Category (Choose best from: ${CATEGORIES.map(c => c.category).join(', ')})
-                                - Description (Brief summary of items)
-                                
-                                Return null for any field that cannot be clearly identified.`
-                            }
-                        ]
-                    }
-                ],
-                {
-                    responseMimeType: "application/json",
-                    responseSchema: {
-                        type: "OBJECT",
-                        properties: {
-                            amount: { type: "NUMBER", description: "Total transaction amount", nullable: true },
-                            currency: { type: "STRING", description: "ISO 4217 currency code", nullable: true },
-                            merchant: { type: "STRING", description: "Name of the merchant or business", nullable: true },
-                            date: { type: "STRING", description: "Transaction date in YYYY-MM-DD format", nullable: true },
-                            category: { type: "STRING", description: "Best matching category", nullable: true },
-                            description: { type: "STRING", description: "Short description of purchased items", nullable: true }
-                        }
-                        // removed required array to allow partial extraction
-                    }
-                }
-            );
+Extract the following information and respond ONLY with a JSON object (no markdown, no explanation):
 
-            const text = response.text();
-            if (text) {
-                // Sanitize Markdown
-                const cleanText = text.replace(/```json\n?|\n?```/g, '').trim();
-                const data = JSON.parse(cleanText) as ScannedReceiptData;
+{
+  "amount": <number or null>,
+  "currency": "<ISO 4217 code like USD, MXN, EUR or null>",
+  "merchant": "<store/business name or null>",
+  "date": "<YYYY-MM-DD format or null>",
+  "category": "<best match from: ${categoryList}, or null>",
+  "description": "<brief 3-5 word summary of items or null>"
+}
 
+Rules:
+- amount must be a number (no currency symbols), use the TOTAL amount
+- If you cannot identify a field, set it to null
+- Respond with ONLY the JSON object, nothing else`;
+
+            // 4. Call local AI with vision
+            const response = await localAI.vision(resizedBase64, prompt, {
+                temperature: 0.1,
+                max_tokens: 512,
+            });
+
+            // 5. Parse response
+            if (response.text) {
+                const data = localAI.parseJSON<ScannedReceiptData>(response.text);
+
+                // Validate currency against supported list
                 if (data.currency) {
                     const supported = CURRENCIES.find(c => c.code === data.currency);
                     if (supported) data.currency = supported.code;
                 }
+
                 onScanComplete?.(data);
             } else {
-                throw new Error("No text returned from AI");
+                throw new Error('No response from AI model');
             }
 
         } catch (err: any) {
-            console.error("Scanning failed", err);
-            const msg = err.message || "Scanning failed";
+            console.error('Receipt scanning failed:', err);
+            const msg = err.message || 'Scanning failed';
             setError(msg);
 
-            // Handle Rate Limiting specifically
-            if (msg.includes("429") || msg.includes("Quota") || msg.includes("limit")) {
-                toast.warning("⏳ AI Traffic High (Rate Limit). Google's free AI service is busy. Please wait 30-60 seconds and try again.");
+            if (err instanceof LocalAIError) {
+                switch (err.code) {
+                    case 'OFFLINE':
+                        toast.error('🔌 LM Studio no está corriendo. Inicia LM Studio para escanear recibos.');
+                        break;
+                    case 'TIMEOUT':
+                        toast.warning('⏳ El modelo está procesando. Intenta de nuevo en unos segundos.');
+                        break;
+                    case 'PARSE_ERROR':
+                        toast.error('⚠️ No se pudo leer el recibo correctamente. Intenta con una foto más clara.');
+                        break;
+                    default:
+                        toast.error(`Error de AI: ${msg}`);
+                }
             } else {
-                toast.error("Error processing receipt: " + msg);
+                toast.error('Error procesando recibo: ' + msg);
             }
         } finally {
             setIsScanning(false);
@@ -130,9 +134,8 @@ export const useReceiptScanner = ({ apiKey, onScanComplete }: UseReceiptScannerP
                     canvas.height = height;
                     const ctx = canvas.getContext('2d');
                     ctx?.drawImage(img, 0, 0, width, height);
-                    // Return raw base64 string (no data:image/jpeg;base64, prefix) for Gemini
                     const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-                    resolve(dataUrl.split(',')[1]);
+                    resolve(dataUrl.split(',')[1]); // raw base64 without prefix
                 };
                 img.onerror = reject;
                 img.src = e.target?.result as string;

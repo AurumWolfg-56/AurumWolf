@@ -8,7 +8,7 @@ import {
     Plus, Camera, ArrowRightLeft, RefreshCw, Maximize2, FileText // [NEW] Icons for Quick Actions
 } from 'lucide-react';
 import { CurrencyConverter } from './CurrencyConverter';
-import { Type } from "@google/genai";
+import { useAIInsights, AIInsight } from '../hooks/useAIInsights';
 import { RecentActivity } from './RecentActivity';
 import { FinancialBreakdown } from './FinancialBreakdown';
 import { DocumentScanner } from './Scanner/DocumentScanner';
@@ -108,35 +108,7 @@ const INITIAL_INSIGHTS: Insight[] = [
     },
 ];
 
-// --- AUDIO HELPERS ---
-function decode(base64: string) {
-    const binaryString = atob(base64);
-    const len = binaryString.length;
-    const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-    }
-    return bytes;
-}
-
-async function decodeAudioData(
-    data: Uint8Array,
-    ctx: AudioContext,
-    sampleRate: number,
-    numChannels: number,
-): Promise<AudioBuffer> {
-    const dataInt16 = new Int16Array(data.buffer);
-    const frameCount = dataInt16.length / numChannels;
-    const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
-
-    for (let channel = 0; channel < numChannels; channel++) {
-        const channelData = buffer.getChannelData(channel);
-        for (let i = 0; i < frameCount; i++) {
-            channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
-        }
-    }
-    return buffer;
-}
+// (Audio decode helpers removed — TTS now uses Web Speech API)
 
 export const DashboardPage: React.FC<DashboardPageProps> = ({
     // investments removed from props
@@ -168,6 +140,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
 
     const locale = language === 'es' ? 'es-MX' : 'en-US';
 
+    const { analyzePortfolio, isLoading: isAILoading } = useAIInsights();
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [isPlaying, setIsPlaying] = useState(false);
     const [isConverterOpen, setIsConverterOpen] = useState(false);
@@ -192,175 +165,95 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
         }
     }, [hasPin, t]);
 
-    // ... (keep audio refs)
-    const audioContextRef = useRef<AudioContext | null>(null);
-    const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
+    // Speech synthesis ref for TTS
+    const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
 
     // Removed internal computations done in hook
     const totalNetWorth = netWorth;
 
-    // AI Analysis Handler
+    // AI Analysis Handler — Uses Local LM Studio
     const handleAnalyzePortfolio = async () => {
         setIsAnalyzing(true);
         try {
-            const { aiClient } = await import('../lib/ai/proxy');
-
-            // Prepare context
             const contextData = {
-                baseCurrency: baseCurrency,
+                baseCurrency,
                 netWorth: totalNetWorth,
                 assets: assetsByType,
-                healthScore: healthScore,
+                healthScore,
+                monthlySurplus,
                 recentSpending: chartData.map(d => ({ day: d.fullLabel, amount: d.value })),
                 upcomingBills: upcomingBills.map(b => ({ name: b.name, amount: b.numericAmount, due: b.nextRecurringDate }))
             };
 
-            const response = await aiClient.generateContent(
-                'gemini-2.0-flash', // Using 2.0 Flash for best availability
-                [{
-                    role: 'user',
-                    parts: [{
-                        text: `As a top-tier financial advisor, analyze this snapshot (values in ${baseCurrency}) and provide 2-3 brief, high-impact executable insights.
-                        Focus on immediate optimization (cash flow, liquidity, savings).
-                        Format as JSON array of objects with keys: id, type (alert|opportunity|info), title, message (max 12 words), action (short label).
-                        Data: ${JSON.stringify(contextData)}`
-                    }]
-                }],
-                {
-                    responseMimeType: "application/json"
-                }
-            );
+            const aiInsights = await analyzePortfolio(contextData);
 
-            const text = response.text();
-            if (text) {
-                try {
-                    const rawData = JSON.parse(text);
-                    const processedInsights: Insight[] = Array.isArray(rawData) ? rawData.map((item: any, idx: number) => ({
-                        id: item.id || `ai-${idx}`,
-                        type: ['alert', 'opportunity', 'info'].includes(item.type) ? item.type : 'info',
-                        title: item.title || 'Insight',
-                        message: item.message || 'Review your recent financial activity.',
-                        action: item.action || 'View',
-                        icon: item.type === 'alert' ? AlertTriangle : item.type === 'opportunity' ? Zap : BrainCircuit
-                    })) : [];
-
-                    if (processedInsights.length > 0) {
-                        setInsights(processedInsights);
-                    }
-                } catch (e) {
-                    console.error("Failed to parse AI response", e);
-                    toast.error("AI Response invalid format");
-                }
+            if (aiInsights.length > 0) {
+                const processedInsights: Insight[] = aiInsights.map((item, idx) => ({
+                    id: item.id || `ai-${idx}`,
+                    type: item.type,
+                    title: item.title,
+                    message: item.message,
+                    action: item.action || 'View',
+                    icon: item.type === 'alert' ? AlertTriangle : item.type === 'opportunity' ? Zap : BrainCircuit
+                }));
+                setInsights(processedInsights);
+                toast.success('✨ Análisis AI completado');
+            } else {
+                toast.info('No se generaron insights. Verifica que LM Studio esté corriendo.');
             }
 
         } catch (error: any) {
-            console.error("AI Analysis Failed:", error);
-
-            // Check for custom AIError code
-            if (error.code === 'QUOTA_EXCEEDED') {
-                // Could set a specific UI state here, but for now specific alert is better than generic
-                toast.warning("⚠️ AI is busy (Quota Exceeded). Please wait 30s and try again.");
-            } else if (error.code === 'UNAUTHORIZED') {
-                toast.error("Please log in again to use AI features.");
+            console.error('AI Analysis Failed:', error);
+            if (error.code === 'OFFLINE') {
+                toast.error('🔌 Inicia LM Studio para usar el análisis AI');
             } else {
-                toast.error(`AI Analysis Failed: ${error.message || "Unknown error"}. Check API Key or Connection.`);
+                toast.error(`AI Error: ${error.message || 'Unknown error'}`);
             }
         } finally {
             setIsAnalyzing(false);
         }
     };
 
-    // Audio Briefing Handler
-    const handlePlayBriefing = async () => {
+    // Audio Briefing Handler — Web Speech API (no AI needed)
+    const handlePlayBriefing = () => {
         if (isPlaying) {
-            if (audioSourceRef.current) {
-                audioSourceRef.current.stop();
-                audioSourceRef.current = null;
-            }
+            window.speechSynthesis.cancel();
             setIsPlaying(false);
             return;
         }
 
-        setIsPlaying(true);
-
-        try {
-            const insightText = insights.map(i => `${i.title}: ${i.message}`).join('. ');
-            const text = `Here is your Aurum Wolf briefing. Current Net Worth is ${formatCurrency(totalNetWorth, baseCurrency, { locale })}. ${insightText || "No urgent alerts at this time."} Have a prosperous day.`;
-
-            const { aiClient } = await import('../lib/ai/proxy');
-
-            // Using the TTS model often available in Gemini (or simulated via correct model config)
-            const response = await aiClient.generateContent(
-                "gemini-2.0-flash",
-                [{ parts: [{ text: `Generate spoken audio for this text: "${text}"` }] }], // Note: Actual TTS request structure depends on capabilities. Assuming text-to-speech config is handled by proxy or model.
-                {
-                    // If the proxy handles 'speechConfig' correctly for a model that supports it:
-                    responseModalities: ["AUDIO"],
-                    speechConfig: {
-                        voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Fenrir' } }
-                    }
-                }
-            );
-
-            // Check for audio data (if using a multimodal model)
-            // If the proxy/client returns standard GenerateContentResponse, check inlineData or similar?
-            // The proxy wrapper usually exposes .audioData() if customized?
-            // Let's assume the standard client method or the one seen in other files.
-
-            // Wait, looking at `ConciergeWidget.tsx` (from memory): it processes audio output.
-            // Let's rely on `response.audioData()` if strictly using the `aiClient` from the proxy provided in this codebase.
-            // If `aiClient` is standard GoogleGenAI client, it might be `response.functionCalls()` etc.
-            // BUT, `lib/ai/proxy.ts` wrapper might add helpers.
-            // I'll assume `response.audioData()` exists or I need to handle base64 from `candidates[0].content.parts[0].inlineData`.
-
-            let audioBase64: string | undefined;
-            // Robust check
-            if (typeof response.audioData === 'function') {
-                audioBase64 = response.audioData();
-            } else {
-                // Fallback to standard structure inspection
-                // @ts-ignore
-                audioBase64 = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
-            }
-
-            if (audioBase64) {
-                const ctx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-                audioContextRef.current = ctx;
-
-                const audioBuffer = await decodeAudioData(
-                    decode(audioBase64),
-                    ctx,
-                    24000,
-                    1
-                );
-
-                const source = ctx.createBufferSource();
-                source.buffer = audioBuffer;
-                source.connect(ctx.destination);
-                source.start();
-                audioSourceRef.current = source;
-
-                source.onended = () => setIsPlaying(false);
-            } else {
-                console.warn("No audio data received");
-                setIsPlaying(false);
-            }
-
-        } catch (error) {
-            console.error("TTS Failed", error);
-            setIsPlaying(false);
+        if (!('speechSynthesis' in window)) {
+            toast.error('Tu navegador no soporta síntesis de voz.');
+            return;
         }
+
+        const insightText = insights.map(i => `${i.title}: ${i.message}`).join('. ');
+        const briefingText = language === 'es'
+            ? `Aquí está tu resumen de Aurum Wolf. Tu patrimonio neto actual es ${formatCurrency(totalNetWorth, baseCurrency, { locale })}. ${insightText || 'No hay alertas urgentes en este momento.'} Que tengas un día próspero.`
+            : `Here is your Aurum Wolf briefing. Current Net Worth is ${formatCurrency(totalNetWorth, baseCurrency, { locale })}. ${insightText || 'No urgent alerts at this time.'} Have a prosperous day.`;
+
+        const utterance = new SpeechSynthesisUtterance(briefingText);
+        utterance.lang = language === 'es' ? 'es-MX' : 'en-US';
+        utterance.rate = 0.95;
+        utterance.pitch = 1.0;
+
+        // Try to find a good voice
+        const voices = window.speechSynthesis.getVoices();
+        const preferred = voices.find(v => v.lang.startsWith(language === 'es' ? 'es' : 'en') && v.name.includes('Google'));
+        if (preferred) utterance.voice = preferred;
+
+        utterance.onend = () => setIsPlaying(false);
+        utterance.onerror = () => setIsPlaying(false);
+
+        utteranceRef.current = utterance;
+        setIsPlaying(true);
+        window.speechSynthesis.speak(utterance);
     };
 
-    // Cleanup Audio
+    // Cleanup Speech
     useEffect(() => {
         return () => {
-            if (audioSourceRef.current) {
-                audioSourceRef.current.stop();
-            }
-            if (audioContextRef.current) {
-                audioContextRef.current.close();
-            }
+            window.speechSynthesis?.cancel();
         };
     }, []);
 

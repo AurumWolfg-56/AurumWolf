@@ -62,24 +62,26 @@ export const CurrencyConverter: React.FC<CurrencyConverterProps> = ({
         if (!rate) return;
         setIsThinking(true);
         try {
-            const { aiClient } = await import('../lib/ai/proxy');
+            const { localAI } = await import('../lib/ai/localAI');
 
-            const prompt = `
-                Current exchange rate: 1 ${fromCurrency} = ${rate.toFixed(4)} ${toCurrency}.
-                User is converting ${amount} ${fromCurrency}.
-                Is this a historically good rate? Provide a very brief (max 15 words) financial insight or tip.
-                Respond in ${language === 'es' ? 'Spanish' : 'English'}.
-            `;
+            const response = await localAI.chat([
+                {
+                    role: 'system',
+                    content: `You are a currency analyst. Give a very brief (max 15 words) insight about the exchange rate. Respond in ${language === 'es' ? 'Spanish' : 'English'}. No markdown.`
+                },
+                {
+                    role: 'user',
+                    content: `Current rate: 1 ${fromCurrency} = ${rate.toFixed(4)} ${toCurrency}. Converting ${amount} ${fromCurrency}. Is this a good rate?`
+                }
+            ], {
+                temperature: 0.5,
+                max_tokens: 64,
+            });
 
-            const response = await aiClient.generateContent(
-                'gemini-2.5-flash',
-                [{ role: 'user', parts: [{ text: prompt }] }]
-            );
-
-            setAiInsight(response.text());
+            setAiInsight(response.text.trim() || null);
         } catch (error) {
-            console.error("AI Insight failed", error);
-            setAiInsight(t('concierge.errorGeneric') || "AI unavailable.");
+            console.error('AI Insight failed', error);
+            setAiInsight(t('concierge.errorGeneric') || 'AI unavailable.');
         } finally {
             setIsThinking(false);
         }

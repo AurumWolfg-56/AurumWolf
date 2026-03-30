@@ -1,10 +1,9 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Sparkles, Send, X, Bot, User, Loader2, ChevronDown, Minimize2, Maximize2, Mic, MicOff, Headphones, Activity } from 'lucide-react';
-import { FunctionDeclaration, Type } from "@google/genai";
+import { localAI } from '../lib/ai/localAI';
 import { Transaction, Account, BudgetCategory, NavTab, Investment } from '../types';
 import { getLocalDateISO } from '../lib/dates';
-import { supabase } from '../lib/supabase';
 import { formatCurrency } from '../lib/money';
 import { convertWithRealRate } from '../lib/currency';
 import { useAuth } from '../contexts/AuthContext';
@@ -29,44 +28,8 @@ interface Message {
     timestamp: Date;
 }
 
-// --- AUDIO UTILS (Per Guidelines) ---
-function decode(base64: string) {
-    const binaryString = atob(base64);
-    const len = binaryString.length;
-    const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-    }
-    return bytes;
-}
+// (Audio decode/encode helpers removed — using Web Speech API for TTS)
 
-function encode(bytes: Uint8Array) {
-    let binary = '';
-    const len = bytes.byteLength;
-    for (let i = 0; i < len; i++) {
-        binary += String.fromCharCode(bytes[i]);
-    }
-    return btoa(binary);
-}
-
-async function decodeAudioData(
-    data: Uint8Array,
-    ctx: AudioContext,
-    sampleRate: number,
-    numChannels: number,
-): Promise<AudioBuffer> {
-    const dataInt16 = new Int16Array(data.buffer);
-    const frameCount = dataInt16.length / numChannels;
-    const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
-
-    for (let channel = 0; channel < numChannels; channel++) {
-        const channelData = buffer.getChannelData(channel);
-        for (let i = 0; i < frameCount; i++) {
-            channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
-        }
-    }
-    return buffer;
-}
 
 export const ConciergeWidget: React.FC<ConciergeWidgetProps> = ({ transactions, accounts, budgets, investments = [], activeTab, onAddTransactionData, onAddBudget, t, language, privacyMode }) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -145,62 +108,29 @@ export const ConciergeWidget: React.FC<ConciergeWidgetProps> = ({ transactions, 
         }
     }, [messages, isOpen]);
 
-    // --- TOOL DEFINITION ---
-    const addTransactionTool: FunctionDeclaration = {
-        name: 'addTransaction',
-        description: 'Add a new financial transaction to the ledger.',
-        parameters: {
-            type: Type.OBJECT,
-            properties: {
-                merchant: { type: Type.STRING, description: 'Name of the merchant or payee' },
-                amount: { type: Type.NUMBER, description: 'Transaction amount' },
-                category: { type: Type.STRING, description: 'Category of expense/income' },
-                type: { type: Type.STRING, enum: ['credit', 'debit'], description: 'Credit (Income) or Debit (Expense)' },
-                date: { type: Type.STRING, description: 'Date in YYYY-MM-DD format (use today if unspecified)' }
-            },
-            required: ['merchant', 'amount', 'type']
-        }
-    };
-
-    const searchTransactionsTool: FunctionDeclaration = {
-        name: 'searchTransactions',
-        description: 'Search for transactions based on a query or date range.',
-        parameters: {
-            type: Type.OBJECT,
-            properties: {
-                query: { type: Type.STRING, description: 'Search term (merchant name, category, etc.)' },
-                startDate: { type: Type.STRING, description: 'Start date (YYYY-MM-DD)' },
-                endDate: { type: Type.STRING, description: 'End date (YYYY-MM-DD)' }
-            }
-        }
-    };
-
-    const createBudgetTool: FunctionDeclaration = {
-        name: 'createBudget',
-        description: 'Create a new monthly budget category.',
-        parameters: {
-            type: Type.OBJECT,
-            properties: {
-                category: { type: Type.STRING, description: 'Name of the budget category (e.g., Dining, Groceries)' },
-                limit: { type: Type.NUMBER, description: 'Monthly limit amount' }
-            },
-            required: ['category', 'limit']
-        }
-    };
-
-    const convertCurrencyTool: FunctionDeclaration = {
-        name: 'convert_currency',
-        description: 'Convert a currency amount to another currency using real-time rates.',
-        parameters: {
-            type: Type.OBJECT,
-            properties: {
-                amount: { type: Type.NUMBER, description: 'Amount to convert' },
-                from: { type: Type.STRING, description: 'Source currency code (e.g. USD, EUR, MXN)' },
-                to: { type: Type.STRING, description: 'Target currency code (e.g. EUR, GBP, JPY)' }
-            },
-            required: ['amount', 'from', 'to']
-        }
-    };
+    // --- TOOL DEFINITIONS (plain objects, no @google/genai types) ---
+    const toolDefinitions = [
+        {
+            name: 'addTransaction',
+            description: 'Add a new financial transaction to the ledger.',
+            parameters: { merchant: 'string', amount: 'number', category: 'string (optional)', type: 'credit|debit', date: 'YYYY-MM-DD (optional)' }
+        },
+        {
+            name: 'searchTransactions',
+            description: 'Search for transactions by query or date range.',
+            parameters: { query: 'string (optional)', startDate: 'YYYY-MM-DD (optional)', endDate: 'YYYY-MM-DD (optional)' }
+        },
+        {
+            name: 'createBudget',
+            description: 'Create a new monthly budget category.',
+            parameters: { category: 'string', limit: 'number' }
+        },
+        {
+            name: 'convert_currency',
+            description: 'Convert a currency amount to another using real-time exchange rates.',
+            parameters: { amount: 'number', from: 'string (e.g. USD)', to: 'string (e.g. EUR)' }
+        },
+    ];
 
     // --- CONTEXT PREPARATION ---
     const getFinancialContext = () => {
@@ -264,150 +194,95 @@ export const ConciergeWidget: React.FC<ConciergeWidgetProps> = ({ transactions, 
         setIsVoiceActive(true);
         isVoiceActiveRef.current = true;
         setVoiceStatus('listening');
-        chunksRef.current = [];
 
         try {
-            // Ensure AudioContext is running (Mobile Safari fix)
-            const checkAudioContext = () => {
-                if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
-                    audioContextRef.current.resume();
+            // Use Web Speech API for recognition
+            const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                alert('Speech recognition not supported in this browser.');
+                stopVoiceSession();
+                return;
+            }
+
+            const recognition = new SpeechRecognition();
+            recognition.lang = language === 'es' ? 'es-MX' : 'en-US';
+            recognition.interimResults = false;
+
+            recognition.onresult = async (event: any) => {
+                const transcript = event.results[0][0].transcript;
+                setVoiceStatus('connecting');
+
+                // Add user message
+                setMessages(prev => [...prev, {
+                    id: Date.now().toString(),
+                    role: 'user',
+                    text: `🎙️ ${transcript}`,
+                    timestamp: new Date()
+                }]);
+
+                try {
+                    const context = getFinancialContext();
+                    const response = await localAI.chat([
+                        {
+                            role: 'system',
+                            content: `You are AurumWolf Voice Concierge. Brief financial assistant. Answer in ${language === 'es' ? 'Spanish' : 'English'}. Keep responses under 30 words. ${privacyMode ? 'PRIVACY MODE ON.' : ''}`
+                        },
+                        {
+                            role: 'user',
+                            content: `Context: ${context}\n\nUser said: ${transcript}`
+                        }
+                    ], { temperature: 0.4, max_tokens: 128 });
+
+                    const aiText = response.text.trim();
+
+                    setMessages(prev => [...prev, {
+                        id: (Date.now() + 1).toString(),
+                        role: 'model',
+                        text: aiText,
+                        timestamp: new Date()
+                    }]);
+
+                    // Speak the response
+                    setVoiceStatus('speaking');
+                    const utterance = new SpeechSynthesisUtterance(aiText);
+                    utterance.lang = language === 'es' ? 'es-MX' : 'en-US';
+                    utterance.rate = 0.95;
+                    utterance.onend = () => {
+                        if (isVoiceActiveRef.current) {
+                            setTimeout(() => {
+                                if (isVoiceActiveRef.current) startVoiceSession();
+                            }, 500);
+                        } else {
+                            setVoiceStatus('idle');
+                        }
+                    };
+                    window.speechSynthesis.speak(utterance);
+
+                } catch (err) {
+                    console.error('Voice AI Error', err);
+                    setVoiceStatus('idle');
                 }
             };
-            checkAudioContext();
 
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            audioStreamRef.current = stream;
-
-            const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
-            const recorder = new MediaRecorder(stream, { mimeType });
-            mediaRecorderRef.current = recorder;
-
-            recorder.ondataavailable = (e) => {
-                if (e.data.size > 0) chunksRef.current.push(e.data);
+            recognition.onerror = (event: any) => {
+                console.error('Speech recognition error', event.error);
+                if (event.error === 'not-allowed') {
+                    alert(t('concierge.micErrorDenied'));
+                }
+                stopVoiceSession();
             };
 
-            recorder.onstop = async () => {
-                setVoiceStatus('connecting'); // Processing...
-                const audioBlob = new Blob(chunksRef.current, { type: mimeType });
-
-                // Convert to base64
-                const reader = new FileReader();
-                reader.readAsDataURL(audioBlob);
-                reader.onloadend = async () => {
-                    const result = reader.result as string;
-                    const base64Audio = result.split(',')[1];
-                    const context = getFinancialContext();
-
-                    try {
-                        const { aiClient } = await import('../lib/ai/proxy');
-
-                        // Send Audio to Geminii via Proxy (Multimodal)
-                        const response = await aiClient.generateContent(
-                            'gemini-2.0-flash', // Multimodal model
-                            [{
-                                role: 'user',
-                                parts: [
-                                    { text: `Context: ${context}. Respond briefly.` },
-                                    { inlineData: { mimeType: 'audio/webm', data: base64Audio } }
-                                ]
-                            }],
-                            {
-                                responseModalities: ["AUDIO"],
-                                systemInstruction: `You are AurumWolf Voice. Concise financial assistant. Use tools if needed. ${privacyMode ? 'PRIVACY MODE ON. DO NOT SPEAK BALANCES.' : ''}`,
-                                tools: [{ functionDeclarations: [addTransactionTool, searchTransactionsTool, createBudgetTool, convertCurrencyTool] }]
-                            }
-                        );
-
-                        // 1. Play Audio Response
-                        const audioResp = response.audioData();
-                        if (audioResp) {
-                            setVoiceStatus('speaking');
-                            const ctx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-                            audioContextRef.current = ctx;
-                            const buffer = await decodeAudioData(decode(audioResp), ctx, 24000, 1);
-                            const source = ctx.createBufferSource();
-                            source.buffer = buffer;
-                            source.connect(ctx.destination);
-                            source.start();
-                            audioSourceRef.current = source;
-                            source.onended = () => {
-                                // Auto-listen for Conversation Mode
-                                if (isVoiceActiveRef.current) {
-                                    // Add a slight delay for natural turn-taking
-                                    setTimeout(() => {
-                                        if (isVoiceActiveRef.current) {
-                                            startVoiceSession();
-                                        }
-                                    }, 500);
-                                } else {
-                                    setVoiceStatus('idle');
-                                }
-                            };
-                        }
-
-                        // 2. Handle Tool Calls (Backend executed tools, we just get result? No, model returns FunctionCall request)
-                        const calls = response.functionCalls();
-                        if (calls.length > 0) {
-                            // ... (Same logic as text mode)
-                            // Ideally we would execute tools and send back results to model to get final speech...
-                            // But for "Turn Based", doing a multi-turn loop is complex.
-                            // Simplified: Execute tool and speak generic success message.
-
-                            for (const call of calls) {
-                                if (call.name === 'addTransaction' && onAddTransactionData) {
-                                    const args = call.args as any;
-                                    onAddTransactionData({
-                                        id: crypto.randomUUID(),
-                                        accountId: accounts[0]?.id || '1',
-                                        name: args.merchant,
-                                        amount: formatCurrency(args.amount, 'USD', { locale }),
-                                        numericAmount: args.amount,
-                                        currency: 'USD',
-                                        date: args.date || getLocalDateISO(),
-                                        category: args.category || 'Uncategorized',
-                                        type: args.type,
-                                        status: 'completed'
-                                    });
-                                }
-
-                                if (call.name === 'convert_currency') {
-                                    const args = call.args as any;
-                                    const result = await convertWithRealRate(args.amount, args.from, args.to);
-                                    if (result) {
-                                        // Since we can't speak back dynamically in this loop, we show a message
-                                        setMessages(prev => [...prev, {
-                                            id: (Date.now() + 1).toString(),
-                                            role: 'model',
-                                            text: `💱 ${formatCurrency(args.amount, args.from, { locale })} = ${formatCurrency(result.convertedAmount, args.to, { locale })}`,
-                                            timestamp: new Date()
-                                        }]);
-                                    }
-                                }
-                                // Other tools...
-                            }
-                        }
-
-                    } catch (err) {
-                        console.error("Voice Processing Error", err);
-                        setVoiceStatus('idle');
-                    }
-                };
+            recognition.onend = () => {
+                // If we're still active but recognition ended naturally, restart
+                // (handled in onresult via startVoiceSession)
             };
 
-            recorder.start();
+            recognition.start();
 
         } catch (err: any) {
-            console.error("Mic Access Error", err);
-            setIsVoiceActive(false);
-            isVoiceActiveRef.current = false;
-
-            if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-                alert(t('concierge.micErrorDenied'));
-            } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-                alert(t('concierge.micErrorNotFound'));
-            } else {
-                alert(`${t('concierge.micErrorUnknown')}: ${err.message || 'Unknown error'}`);
-            }
+            console.error('Mic Access Error', err);
+            stopVoiceSession();
+            alert(`${t('concierge.micErrorUnknown')}: ${err.message || 'Unknown error'}`);
         }
     };
 
@@ -421,158 +296,129 @@ export const ConciergeWidget: React.FC<ConciergeWidgetProps> = ({ transactions, 
         setIsLoading(true);
 
         try {
-            const { aiClient } = await import('../lib/ai/proxy');
             const context = getFinancialContext();
+            const toolsDesc = toolDefinitions.map(t => `- ${t.name}: ${t.description}`).join('\n');
 
-            const response = await aiClient.generateContent(
-                'gemini-2.5-flash',
-                [
-                    {
-                        role: 'user',
-                        parts: [{ text: `Context Data:\n${context}\n\nUser Query: ${userMsg.text}` }]
-                    }
-                ],
+            const response = await localAI.chat([
                 {
-                    systemInstruction: `You are the AurumWolf Concierge. Use tools to add transactions if asked. Answer financial questions briefly. ${privacyMode ? 'PRIVACY MODE ON. DO NOT REVEAL SPECIFIC BALANCES OR SENSITIVE DATA UNLESS EXPLICITLY ASKED BY USER.' : ''}`,
-                    tools: [
-                        { functionDeclarations: [addTransactionTool, searchTransactionsTool, createBudgetTool, convertCurrencyTool] }
-                    ]
-                }
-            );
+                    role: 'system',
+                    content: `You are the AurumWolf Concierge, a premium financial assistant. Answer questions briefly and helpfully. Respond in ${language === 'es' ? 'Spanish' : 'English'}. ${privacyMode ? 'PRIVACY MODE ON. Do not reveal specific balances.' : ''}
 
-            const functionCalls = response.functionCalls();
-            if (functionCalls && functionCalls.length > 0) {
-                const call = functionCalls[0];
-                if (call.name === 'addTransaction' && onAddTransactionData) {
-                    const args = call.args as any;
-                    const newTx: Transaction = {
-                        id: crypto.randomUUID(),
-                        accountId: accounts[0]?.id || '1',
-                        name: args.merchant,
-                        amount: formatCurrency(args.amount, 'USD', { locale }),
-                        numericAmount: args.amount,
-                        currency: 'USD',
-                        date: args.date || new Date().toISOString().split('T')[0],
-                        category: args.category || 'Uncategorized',
-                        type: args.type,
-                        status: 'completed',
-                        description: t('concierge.addedVia')
-                    };
-                    onAddTransactionData(newTx);
-                    setMessages(prev => [...prev, {
-                        id: (Date.now() + 1).toString(),
-                        role: 'model',
-                        text: t('concierge.transactionRecorded')
+You have access to these tools (describe what you would do, the app will execute):
+${toolsDesc}
+
+If the user asks to add a transaction, respond with a JSON block like:
+{"tool": "addTransaction", "args": {"merchant": "...", "amount": ..., "type": "debit", "category": "..."}}
+
+If the user asks to convert currency, respond with:
+{"tool": "convert_currency", "args": {"amount": ..., "from": "...", "to": "..."}}
+
+If the user asks to create a budget, respond with:
+{"tool": "createBudget", "args": {"category": "...", "limit": ...}}
+
+Otherwise, just answer their question naturally. Include the JSON at the END of your response if a tool is needed.`
+                },
+                {
+                    role: 'user',
+                    content: `Context Data:\n${context}\n\nUser Query: ${userMsg.text}`
+                }
+            ], { temperature: 0.4, max_tokens: 512 });
+
+            let responseText = response.text.trim();
+
+            // Try to extract tool call JSON from response
+            const jsonMatch = responseText.match(/\{\s*"tool"\s*:.+\}/s);
+            if (jsonMatch) {
+                try {
+                    const toolCall = JSON.parse(jsonMatch[0]);
+                    const cleanText = responseText.replace(jsonMatch[0], '').trim();
+                    
+                    // Execute tool
+                    if (toolCall.tool === 'addTransaction' && onAddTransactionData) {
+                        const args = toolCall.args;
+                        const newTx: Transaction = {
+                            id: crypto.randomUUID(),
+                            accountId: accounts[0]?.id || '1',
+                            name: args.merchant,
+                            amount: formatCurrency(args.amount, 'USD', { locale }),
+                            numericAmount: args.amount,
+                            currency: 'USD',
+                            date: args.date || new Date().toISOString().split('T')[0],
+                            category: args.category || 'Uncategorized',
+                            type: args.type,
+                            status: 'completed',
+                            description: t('concierge.addedVia')
+                        };
+                        onAddTransactionData(newTx);
+                        responseText = cleanText || t('concierge.transactionRecorded')
                             .replace('{name}', newTx.name)
-                            .replace('{amount}', formatCurrency(Number(newTx.amount), newTx.currency || 'USD', { locale })),
-                        timestamp: new Date()
-                    }]);
-                }
-                if (call.name === 'searchTransactions') {
-                    const args = call.args as any;
-                    const query = (args.query || '').trim();
-                    let responseText = t('concierge.noResults');
-
-                    try {
-                        let dbQuery = supabase
-                            .from('transactions')
-                            .select('*')
-                            .order('date', { ascending: false })
-                            .limit(10);
-
-                        if (query) {
-                            // Search name or category case-insensitive
-                            dbQuery = dbQuery.or(`name.ilike.%${query}%,category.ilike.%${query}%`);
-                        }
-
-                        // Date filters are tricky in 'or' logic, so we chain them if present
-                        if (args.startDate) dbQuery = dbQuery.gte('date', args.startDate);
-                        if (args.endDate) dbQuery = dbQuery.lte('date', args.endDate);
-
-                        const { data, error } = await dbQuery;
-
-                        if (error) {
-                            console.error("Search error:", error);
-                            responseText = t('common.error');
-                        } else if (data && data.length > 0) {
-                            const foundMsg = t('concierge.foundTransactions').replace('{count}', data.length.toString());
-                            responseText = `${foundMsg}\n` +
-                                data.map((t: any) => `- ${t.date}: ${t.name} (${formatCurrency(t.amount, t.currency || 'USD', { locale, compact: true })})`).join('\n');
-                        } else {
-                            responseText = t('concierge.noResults');
-                        }
-
-                    } catch (err) {
-                        console.error("Search exception:", err);
-                        responseText = t('common.error');
+                            .replace('{amount}', formatCurrency(Number(newTx.numericAmount), newTx.currency || 'USD', { locale }));
                     }
 
-                    setMessages(prev => [...prev, {
-                        id: (Date.now() + 1).toString(),
-                        role: 'model',
-                        text: responseText,
-                        timestamp: new Date()
-                    }]);
-                }
-
-                if (call.name === 'createBudget' && onAddBudget) {
-                    const args = call.args as any;
-                    onAddBudget({
-                        category: args.category,
-                        limit: args.limit,
-                        color: 'bg-indigo-500', // Default color
-                        currency: 'USD',
-                        icon_key: 'Tag',
-                        type: 'expense'
-                    });
-                    setMessages(prev => [...prev, {
-                        id: (Date.now() + 1).toString(),
-                        role: 'model',
-                        text: t('concierge.budgetCreated')
-                            .replace('{category}', args.category)
-                            .replace('{limit}', formatCurrency(Number(args.limit), 'USD', { locale, compact: true })),
-                        timestamp: new Date()
-                    }]);
-                }
-
-                if (call.name === 'convert_currency') {
-                    const args = call.args as any;
-                    try {
+                    if (toolCall.tool === 'convert_currency') {
+                        const args = toolCall.args;
                         const result = await convertWithRealRate(args.amount, args.from, args.to);
                         if (result) {
-                            setMessages(prev => [...prev, {
-                                id: (Date.now() + 1).toString(),
-                                role: 'model',
-                                text: `💱 ${formatCurrency(args.amount, args.from, { locale })} = **${formatCurrency(result.convertedAmount, args.to, { locale })}**\n(Rate: ${result.rate.toFixed(4)})`,
-                                timestamp: new Date()
-                            }]);
-                        } else {
-                            setMessages(prev => [...prev, {
-                                id: (Date.now() + 1).toString(),
-                                role: 'model',
-                                text: t('common.error'),
-                                timestamp: new Date()
-                            }]);
+                            responseText = (cleanText ? cleanText + '\n' : '') + 
+                                `💱 ${formatCurrency(args.amount, args.from, { locale })} = **${formatCurrency(result.convertedAmount, args.to, { locale })}** (Rate: ${result.rate.toFixed(4)})`;
                         }
-                    } catch (err) {
-                        console.error("Conversion error", err);
                     }
+
+                    if (toolCall.tool === 'createBudget' && onAddBudget) {
+                        const args = toolCall.args;
+                        onAddBudget({
+                            category: args.category,
+                            limit: args.limit,
+                            color: 'bg-indigo-500',
+                            currency: 'USD',
+                            icon_key: 'Tag',
+                            type: 'expense'
+                        });
+                        responseText = cleanText || t('concierge.budgetCreated')
+                            .replace('{category}', args.category)
+                            .replace('{limit}', formatCurrency(Number(args.limit), 'USD', { locale, compact: true }));
+                    }
+
+                    if (toolCall.tool === 'searchTransactions') {
+                        const args = toolCall.args;
+                        const query = (args.query || '').toLowerCase();
+                        let results = transactions;
+                        if (query) {
+                            results = transactions.filter(t => 
+                                t.name.toLowerCase().includes(query) || 
+                                (t.category || '').toLowerCase().includes(query)
+                            );
+                        }
+                        if (args.startDate) results = results.filter(t => t.date >= args.startDate);
+                        if (args.endDate) results = results.filter(t => t.date <= args.endDate);
+                        results = results.slice(0, 10);
+
+                        if (results.length > 0) {
+                            responseText = (cleanText ? cleanText + '\n' : '') + 
+                                t('concierge.foundTransactions').replace('{count}', results.length.toString()) + '\n' +
+                                results.map(t => `- ${t.date}: ${t.name} (${formatCurrency(t.numericAmount, t.currency || 'USD', { locale, compact: true })})`).join('\n');
+                        } else {
+                            responseText = cleanText || t('concierge.noResults');
+                        }
+                    }
+                } catch {
+                    // JSON parse failed, just use plain text
                 }
-            } else {
-                setMessages(prev => [...prev, {
-                    id: (Date.now() + 1).toString(),
-                    role: 'model',
-                    text: response.text() || t('concierge.processed'),
-                    timestamp: new Date()
-                }]);
             }
+
+            setMessages(prev => [...prev, {
+                id: (Date.now() + 1).toString(),
+                role: 'model',
+                text: responseText || t('concierge.processed'),
+                timestamp: new Date()
+            }]);
 
         } catch (error) {
             console.error(error);
             setMessages(prev => [...prev, {
                 id: (Date.now() + 1).toString(),
                 role: 'model',
-                text: `${t('concierge.connectionError')} Details: ${error instanceof Error ? error.message : String(error)}`,
+                text: `${t('concierge.connectionError')} ${error instanceof Error ? error.message : String(error)}`,
                 timestamp: new Date()
             }]);
         } finally {

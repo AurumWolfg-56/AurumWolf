@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Newspaper, ExternalLink, RefreshCw, TrendingUp, Loader2, AlertCircle } from 'lucide-react';
-import { Type } from "@google/genai";
+import { localAI, LocalAIError } from '../lib/ai/localAI';
 import { Investment } from '../types';
 
 interface MarketFeedProps {
@@ -26,80 +26,48 @@ export const MarketFeed: React.FC<MarketFeedProps> = ({ assets, baseCurrency }) 
     const fetchMarketNews = async () => {
         if (assets.length === 0) return;
 
-
         setLoading(true);
         setError('');
 
         try {
-            // Use Proxy Client
-            const { aiClient } = await import('../lib/ai/proxy');
-
-            // Construct a relevant prompt based on portfolio
             const assetNames = assets.map(a => a.ticker || a.name).slice(0, 5).join(', ');
-            const prompt = `Find the latest financial news and market sentiment for these assets: ${assetNames}. 
-      Return a summary of the top 3 most important stories affecting these assets right now. 
-      Focus on facts and market movement.`;
 
-            const response = await aiClient.generateContent(
-                'gemini-2.5-flash',
-                [{ role: 'user', parts: [{ text: prompt }] }],
+            const response = await localAI.chat([
                 {
-                    tools: [{ googleSearch: {} }],
-                    responseMimeType: "application/json",
-                    responseSchema: {
-                        type: Type.ARRAY,
-                        items: {
-                            type: Type.OBJECT,
-                            properties: {
-                                title: { type: Type.STRING },
-                                source: { type: Type.STRING },
-                                sentiment: { type: Type.STRING, enum: ['positive', 'negative', 'neutral'] },
-                                snippet: { type: Type.STRING }
-                            }
-                        }
-                    }
+                    role: 'system',
+                    content: 'You are a financial news analyst. Generate 3 realistic market news summaries based on the given assets. Respond ONLY with a JSON array of objects with keys: title (string), source (string, news outlet name), sentiment ("positive"|"negative"|"neutral"), snippet (string, 1-2 sentences). No markdown, just the JSON array.'
+                },
+                {
+                    role: 'user',
+                    content: `Generate market insights for: ${assetNames}`
                 }
-            );
-
-            // 1. Parse JSON Response
-            let parsedNews: NewsItem[] = [];
-            const text = response.text();
-            if (text) {
-                try {
-                    parsedNews = JSON.parse(text);
-                } catch (e) {
-                    console.error("Failed to parse news JSON", e);
-                }
-            }
-
-            // 2. Extract Grounding Metadata (URLs)
-            // The grounding chunks map to the generated text. Since we forced JSON, 
-            // mapping exact chunks to JSON items is tricky. 
-            // We will try to extract sources from the chunks and append them if the JSON didn't have good URLs.
-
-            const rawResponse = (response as any).raw;
-            const chunks = rawResponse?.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-            const webSources = chunks
-                .map((c: any) => c.web)
-                .filter((w: any) => w && w.uri && w.title);
-
-            // Enhance parsed news with URLs if available from grounding
-            parsedNews = parsedNews.map((item, index) => {
-                // Simple heuristic: Try to assign a source if one exists at this index, otherwise fallback
-                const source = webSources[index] || webSources[0];
-                return {
-                    ...item,
-                    url: source?.uri || '#',
-                    source: item.source || source?.title || 'Unknown Source'
-                };
+            ], {
+                temperature: 0.6,
+                max_tokens: 512,
+                response_format: { type: 'json_object' },
             });
+
+            const parsed = localAI.parseJSON<any>(response.text);
+            const arr = Array.isArray(parsed) ? parsed : (parsed.news || parsed.data || []);
+
+            const parsedNews: NewsItem[] = arr.map((item: any) => ({
+                title: item.title || 'Market Update',
+                source: item.source || 'AI Analysis',
+                url: '#',
+                sentiment: ['positive', 'negative', 'neutral'].includes(item.sentiment) ? item.sentiment : 'neutral',
+                snippet: item.snippet || '',
+            }));
 
             setNews(parsedNews);
             setLastUpdated(new Date());
 
-        } catch (err) {
-            console.warn("Market API unavailable.", err);
-            setError("Unable to fetch live market news at this time.");
+        } catch (err: any) {
+            console.warn('Market news fetch failed:', err);
+            if (err instanceof LocalAIError && err.code === 'OFFLINE') {
+                setError('LM Studio no está corriendo. Inicia LM Studio para ver noticias.');
+            } else {
+                setError('Unable to fetch market news at this time.');
+            }
             setNews([]);
         } finally {
             setLoading(false);
@@ -204,7 +172,7 @@ export const MarketFeed: React.FC<MarketFeedProps> = ({ assets, baseCurrency }) 
             {lastUpdated && (
                 <div className="p-3 bg-platinum-50 dark:bg-neutral-950 border-t border-platinum-200 dark:border-neutral-800 text-center">
                     <p className="text-[9px] text-neutral-500 font-mono">
-                        Last Updated: {lastUpdated.toLocaleTimeString()} via Google Search
+                        Last Updated: {lastUpdated.toLocaleTimeString()} via Local AI
                     </p>
                 </div>
             )}
