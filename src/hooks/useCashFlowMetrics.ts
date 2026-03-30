@@ -11,20 +11,16 @@ import { convertAmount } from '../lib/money';
 // ============================================
 
 const DEBT_KEYWORDS = [
-  // English
   'loan', 'mortgage', 'debt', 'credit card payment', 'car payment',
   'auto payment', 'student loan', 'financing', 'installment',
-  // Spanish
   'préstamo', 'prestamo', 'hipoteca', 'deuda', 'pago de tarjeta',
   'pago del carro', 'pago de auto', 'cuota', 'financiamiento',
   'crédito universitario', 'credito universitario', 'pago universitario'
 ];
 
 const SAVINGS_INVESTMENT_KEYWORDS = [
-  // English
   'savings', 'saving', 'investment', 'investing', 'emergency fund',
   'retirement', 'reserve',
-  // Spanish
   'ahorro', 'inversión', 'inversion', 'fondo de emergencia',
   'retiro', 'reserva'
 ];
@@ -52,7 +48,6 @@ function inferAssetsFromLiabilities(
   for (const liability of liabilities) {
     switch (liability.type) {
       case 'mortgage': {
-        // Property value ≈ remaining balance × 1.2 (conservative estimate)
         const estimatedValue = convertAmount(
           liability.currentBalance * 1.2,
           liability.currency,
@@ -69,7 +64,6 @@ function inferAssetsFromLiabilities(
         break;
       }
       case 'auto_loan': {
-        // Vehicle depreciates: current value ≈ balance × 0.8
         const estimatedValue = convertAmount(
           liability.currentBalance * 0.8,
           liability.currency,
@@ -86,11 +80,10 @@ function inferAssetsFromLiabilities(
         break;
       }
       case 'student_loan': {
-        // Education is intangible, show as informational
         inferred.push({
           name: liability.name || 'Educación',
           type: 'education',
-          value: 0, // Not a tangible asset
+          value: 0,
           sourceType: 'liability',
           sourceId: liability.id,
           icon: 'GraduationCap',
@@ -104,6 +97,100 @@ function inferAssetsFromLiabilities(
 }
 
 // ============================================
+// MONTHLY SNAPSHOT TYPE
+// ============================================
+
+export interface MonthlySnapshot {
+  month: string;        // "2026-01"
+  label: string;        // "Ene 2026"
+  monthlyNetIncome: number;
+  monthlyTotalExpenses: number;
+  monthlyCashFlow: number;
+  monthlySavingsInvestment: number;
+  monthlyDebtPayments: number;
+  savingsRate: number;
+  savingsRateStatus: 'alarm' | 'solid' | 'acceleration';
+  dti: number;
+  dtiStatus: 'high_pressure' | 'acceptable' | 'room';
+}
+
+// ============================================
+// HELPER: Compute metrics for a date range
+// ============================================
+
+const EXCLUDED_CATEGORIES = [
+  'Transfer', 'Adjustment', 'Starting Balance',
+  'Credit Card Payment', 'Balance Adjustment'
+];
+const EXCLUDED_NAMES = ['Starting Balance', 'Balance Adjustment'];
+
+function computePeriodMetrics(
+  transactions: Transaction[],
+  liabilities: PersonalLiability[],
+  periodStart: string,
+  periodEnd: string,
+  baseCurrency: string,
+) {
+  const periodTx = transactions.filter(t => {
+    if (t.date < periodStart || t.date > periodEnd) return false;
+    if (EXCLUDED_CATEGORIES.includes(t.category)) return false;
+    if (EXCLUDED_NAMES.includes(t.name)) return false;
+    return true;
+  });
+
+  const monthlyNetIncome = periodTx
+    .filter(t => t.type === 'credit')
+    .reduce((acc, t) => acc + convertAmount(t.numericAmount, t.currency || 'USD', baseCurrency), 0);
+
+  const monthlyTotalExpenses = periodTx
+    .filter(t => t.type === 'debit')
+    .reduce((acc, t) => acc + convertAmount(t.numericAmount, t.currency || 'USD', baseCurrency), 0);
+
+  const monthlyCashFlow = monthlyNetIncome - monthlyTotalExpenses;
+
+  const monthlySavingsInvestment = periodTx
+    .filter(t => t.type === 'debit' && isSavingsOrInvestment(t.category))
+    .reduce((acc, t) => acc + convertAmount(t.numericAmount, t.currency || 'USD', baseCurrency), 0);
+
+  const debtFromTransactions = periodTx
+    .filter(t => t.type === 'debit' && isDebtCategory(t.category))
+    .reduce((acc, t) => acc + convertAmount(t.numericAmount, t.currency || 'USD', baseCurrency), 0);
+
+  const debtFromLiabilities = liabilities
+    .reduce((acc, l) => acc + convertAmount(l.monthlyPayment, l.currency, baseCurrency), 0);
+
+  const monthlyDebtPayments = Math.max(debtFromTransactions, debtFromLiabilities);
+
+  const savingsRate = monthlyNetIncome > 0
+    ? monthlySavingsInvestment / monthlyNetIncome
+    : 0;
+
+  const savingsRateStatus: MonthlySnapshot['savingsRateStatus'] =
+    savingsRate >= 0.30 ? 'acceleration' :
+      savingsRate >= 0.15 ? 'solid' : 'alarm';
+
+  const dti = monthlyNetIncome > 0
+    ? monthlyDebtPayments / monthlyNetIncome
+    : 0;
+
+  const dtiStatus: MonthlySnapshot['dtiStatus'] =
+    dti > 0.40 ? 'high_pressure' :
+      dti >= 0.20 ? 'acceptable' : 'room';
+
+  return {
+    monthlyNetIncome,
+    monthlyTotalExpenses,
+    monthlyCashFlow,
+    monthlySavingsInvestment,
+    monthlyDebtPayments,
+    savingsRate,
+    savingsRateStatus,
+    dti,
+    dtiStatus,
+  };
+}
+
+// ============================================
 // HOOK
 // ============================================
 
@@ -114,6 +201,13 @@ interface UseCashFlowMetricsProps {
   investments: Investment[];
   budgets: BudgetCategory[];
   baseCurrency: string;
+  periodStart: string;  // ISO date "YYYY-MM-DD"
+  periodEnd: string;    // ISO date "YYYY-MM-DD"
+  language?: string;
+}
+
+export interface CashFlowMetricsResult extends CashFlowMetrics {
+  monthlySnapshots: MonthlySnapshot[];
 }
 
 export const useCashFlowMetrics = ({
@@ -123,95 +217,26 @@ export const useCashFlowMetrics = ({
   investments,
   budgets,
   baseCurrency,
-}: UseCashFlowMetricsProps): CashFlowMetrics => {
+  periodStart,
+  periodEnd,
+  language = 'en',
+}: UseCashFlowMetricsProps): CashFlowMetricsResult => {
 
   return useMemo(() => {
-    // ============================================
-    // 1. MONTHLY TRANSACTIONS (current month)
-    // ============================================
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-      .toISOString().split('T')[0];
-
-    const EXCLUDED_CATEGORIES = [
-      'Transfer', 'Adjustment', 'Starting Balance',
-      'Credit Card Payment', 'Balance Adjustment'
-    ];
-    const EXCLUDED_NAMES = ['Starting Balance', 'Balance Adjustment'];
-
-    const monthTx = transactions.filter(t => {
-      if (t.date < startOfMonth) return false;
-      if (EXCLUDED_CATEGORIES.includes(t.category)) return false;
-      if (EXCLUDED_NAMES.includes(t.name)) return false;
-      return true;
-    });
-
-    // --- Net Income (credits this month) ---
-    const monthlyNetIncome = monthTx
-      .filter(t => t.type === 'credit')
-      .reduce((acc, t) => acc + convertAmount(
-        t.numericAmount, t.currency || 'USD', baseCurrency
-      ), 0);
-
-    // --- Total Expenses (debits this month) ---
-    const monthlyTotalExpenses = monthTx
-      .filter(t => t.type === 'debit')
-      .reduce((acc, t) => acc + convertAmount(
-        t.numericAmount, t.currency || 'USD', baseCurrency
-      ), 0);
-
-    // --- Cash Flow ---
-    const monthlyCashFlow = monthlyNetIncome - monthlyTotalExpenses;
-
-    // --- Savings + Investment (debits to savings/investment categories) ---
-    const monthlySavingsInvestment = monthTx
-      .filter(t => t.type === 'debit' && isSavingsOrInvestment(t.category))
-      .reduce((acc, t) => acc + convertAmount(
-        t.numericAmount, t.currency || 'USD', baseCurrency
-      ), 0);
-
-    // --- Debt Payments (anti-double-count) ---
-    const debtFromTransactions = monthTx
-      .filter(t => t.type === 'debit' && isDebtCategory(t.category))
-      .reduce((acc, t) => acc + convertAmount(
-        t.numericAmount, t.currency || 'USD', baseCurrency
-      ), 0);
-
-    const debtFromLiabilities = liabilities
-      .reduce((acc, l) => acc + convertAmount(
-        l.monthlyPayment, l.currency, baseCurrency
-      ), 0);
-
-    // Use the greater of the two to avoid double counting
-    const monthlyDebtPayments = Math.max(debtFromTransactions, debtFromLiabilities);
+    const locale = language === 'es' ? 'es-MX' : 'en-US';
 
     // ============================================
-    // 2. KEY INDICATORS
+    // 1. PERIOD-BASED METRICS
     // ============================================
-
-    // --- Savings Rate = (Savings + Investment) / Net Income ---
-    const savingsRate = monthlyNetIncome > 0
-      ? monthlySavingsInvestment / monthlyNetIncome
-      : 0;
-
-    const savingsRateStatus: CashFlowMetrics['savingsRateStatus'] =
-      savingsRate >= 0.30 ? 'acceleration' :
-        savingsRate >= 0.15 ? 'solid' : 'alarm';
-
-    // --- DTI = Monthly Debt Payments / Net Income ---
-    const dti = monthlyNetIncome > 0
-      ? monthlyDebtPayments / monthlyNetIncome
-      : 0;
-
-    const dtiStatus: CashFlowMetrics['dtiStatus'] =
-      dti > 0.40 ? 'high_pressure' :
-        dti >= 0.20 ? 'acceptable' : 'room';
+    const periodData = computePeriodMetrics(
+      transactions, liabilities, periodStart, periodEnd, baseCurrency
+    );
 
     // ============================================
-    // 3. ASSET BREAKDOWN (from real accounts/investments)
+    // 2. ASSET BREAKDOWN (always current state)
     // ============================================
 
-    // --- Liquid Assets (checking + savings with positive balance) ---
+    // Liquid Assets
     const liquidAccountsList: RealAccountAsset[] = accounts
       .filter(a => (a.type === 'checking' || a.type === 'savings') && a.balance > 0)
       .map(a => ({
@@ -222,10 +247,9 @@ export const useCashFlowMetrics = ({
         currency: a.currency,
         accountType: a.type,
       }));
-
     const liquidAssets = liquidAccountsList.reduce((acc, a) => acc + a.balance, 0);
 
-    // --- Financial Assets (investment + crypto accounts + portfolio investments) ---
+    // Financial Assets
     const financialAccountsList: RealAccountAsset[] = accounts
       .filter(a => (a.type === 'investment' || a.type === 'crypto') && a.balance > 0)
       .map(a => ({
@@ -249,7 +273,7 @@ export const useCashFlowMetrics = ({
     const financialAssets = financialAccountsList.reduce((acc, a) => acc + a.balance, 0)
       + financialInvestmentsList.reduce((acc, i) => acc + i.currentValue, 0);
 
-    // --- Business Assets ---
+    // Business Assets
     const businessAccountsList: RealAccountAsset[] = accounts
       .filter(a => a.type === 'business' && a.balance > 0)
       .map(a => ({
@@ -260,26 +284,21 @@ export const useCashFlowMetrics = ({
         currency: a.currency,
         accountType: a.type,
       }));
-
     const businessAssets = businessAccountsList.reduce((acc, a) => acc + a.balance, 0);
 
-    // --- Inferred Physical Assets (from liabilities) ---
+    // Inferred Physical Assets
     const inferredPhysicalAssets = inferAssetsFromLiabilities(liabilities, baseCurrency);
-    const inferredPhysicalTotal = inferredPhysicalAssets
-      .reduce((acc, a) => acc + a.value, 0);
+    const inferredPhysicalTotal = inferredPhysicalAssets.reduce((acc, a) => acc + a.value, 0);
 
     // ============================================
-    // 4. LIABILITIES
+    // 3. LIABILITIES
     // ============================================
-
-    // Credit card debt from accounts
     const creditCardDebt = accounts
       .filter(a => a.type === 'credit')
       .reduce((acc, a) => acc + Math.abs(
         convertAmount(Math.min(0, a.balance), a.currency, baseCurrency)
       ), 0);
 
-    // Registered liabilities total
     const registeredLiabilitiesTotal = liabilities.reduce(
       (acc, l) => acc + convertAmount(l.currentBalance, l.currency, baseCurrency), 0
     );
@@ -287,18 +306,15 @@ export const useCashFlowMetrics = ({
     const totalLiabilities = creditCardDebt + registeredLiabilitiesTotal;
 
     // ============================================
-    // 5. TOTALS
+    // 4. TOTALS
     // ============================================
-
     const totalAssets = liquidAssets + financialAssets + businessAssets + inferredPhysicalTotal;
     const netWorth = totalAssets - totalLiabilities;
 
     // ============================================
-    // 6. LIQUIDITY MONTHS
+    // 5. LIQUIDITY MONTHS (using period data or 3mo avg)
     // ============================================
-
-    // Use average monthly expenses for more accurate liquidity calculation.
-    // If current month has few data points, use last 3 months average.
+    const now = new Date();
     const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, 1)
       .toISOString().split('T')[0];
 
@@ -310,19 +326,16 @@ export const useCashFlowMetrics = ({
         if (EXCLUDED_NAMES.includes(t.name)) return false;
         return true;
       })
-      .reduce((acc, t) => acc + convertAmount(
-        t.numericAmount, t.currency || 'USD', baseCurrency
-      ), 0);
+      .reduce((acc, t) => acc + convertAmount(t.numericAmount, t.currency || 'USD', baseCurrency), 0);
 
     const monthsOfData = Math.max(1, Math.min(3,
       (now.getMonth() - new Date(threeMonthsAgo).getMonth() + 12) % 12 || 3
     ));
     const avgMonthlyExpenses = last3MonthsExpenses / monthsOfData;
 
-    // KEY FIX: if no expenses AND no liquid assets, liquidity = 0, NOT 99
     const liquidityMonths = avgMonthlyExpenses > 0
       ? liquidAssets / avgMonthlyExpenses
-      : 0; // No expenses = can't calculate runway meaningfully
+      : 0;
 
     const liquidityStatus: CashFlowMetrics['liquidityStatus'] =
       liquidityMonths < 1 ? 'critical' :
@@ -330,19 +343,48 @@ export const useCashFlowMetrics = ({
           liquidityMonths < 6 ? 'healthy' :
             liquidityMonths < 12 ? 'solid' : 'ultra_defensive';
 
-    return {
-      // Monthly Dashboard
-      monthlyNetIncome,
-      monthlyTotalExpenses,
-      monthlyCashFlow,
-      monthlySavingsInvestment,
-      monthlyDebtPayments,
+    // ============================================
+    // 6. MONTHLY SNAPSHOTS (for comparison view)
+    // ============================================
+    const monthlySnapshots: MonthlySnapshot[] = [];
+    const startDate = new Date(periodStart + 'T00:00:00');
+    const endDate = new Date(periodEnd + 'T00:00:00');
 
-      // Key Indicators
-      savingsRate,
-      savingsRateStatus,
-      dti,
-      dtiStatus,
+    // Generate each month in the range
+    const cursor = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+    const lastMonth = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
+
+    while (cursor <= lastMonth) {
+      const y = cursor.getFullYear();
+      const m = cursor.getMonth();
+      const monthStart = `${y}-${String(m + 1).padStart(2, '0')}-01`;
+      const monthEndDate = new Date(y, m + 1, 0); // last day of month
+      const monthEnd = `${y}-${String(m + 1).padStart(2, '0')}-${String(monthEndDate.getDate()).padStart(2, '0')}`;
+      const monthKey = `${y}-${String(m + 1).padStart(2, '0')}`;
+
+      const monthLabel = new Date(y, m, 15).toLocaleDateString(locale, {
+        month: 'short',
+        year: 'numeric'
+      });
+
+      const snap = computePeriodMetrics(
+        transactions, liabilities, monthStart, monthEnd, baseCurrency
+      );
+
+      monthlySnapshots.push({
+        month: monthKey,
+        label: monthLabel,
+        ...snap,
+      });
+
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+
+    return {
+      // Period metrics
+      ...periodData,
+
+      // Liquidity
       liquidityMonths,
       liquidityStatus,
 
@@ -360,6 +402,9 @@ export const useCashFlowMetrics = ({
       totalAssets,
       totalLiabilities,
       netWorth,
+
+      // Monthly comparison
+      monthlySnapshots,
     };
-  }, [liabilities, accounts, transactions, investments, budgets, baseCurrency]);
+  }, [liabilities, accounts, transactions, investments, budgets, baseCurrency, periodStart, periodEnd, language]);
 };
