@@ -391,6 +391,7 @@ export default function App() {
                     baseCurrency={baseCurrency}
                     t={t}
                     language={language}
+                    categories={categories}
                 />;
             case 'reports':
                 return <ReportsPage

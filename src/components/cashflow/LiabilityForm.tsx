@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { X, Save, Trash2, Lock, Unlock } from 'lucide-react';
-import { PersonalLiability, LiabilityType, ExpenseClassification } from '../../types';
+import { PersonalLiability, LiabilityType } from '../../types';
 
 interface LiabilityFormProps {
   initialData?: PersonalLiability | null;
@@ -26,15 +26,7 @@ const LIABILITY_TYPES: { value: LiabilityType; label: string }[] = [
   { value: 'other', label: '📦 Other' },
 ];
 
-const EXPENSE_CLASSES: { value: ExpenseClassification; label: string; desc: string }[] = [
-  { value: 'fixed', label: 'Fixed', desc: 'Same amount every month (mortgage, car payment)' },
-  { value: 'variable', label: 'Variable', desc: 'Fluctuates each period (credit card, utilities)' },
-  { value: 'semi_fixed', label: 'Semi-Fixed', desc: 'Base + variable component' },
-  { value: 'operational', label: 'Operational', desc: 'Essential for daily operations' },
-  { value: 'non_operational', label: 'Non-Operational', desc: 'Non-essential, one-time or irregular' },
-  { value: 'unnecessary', label: 'Unnecessary', desc: 'Avoidable debt, should eliminate' },
-  { value: 'discretionary', label: 'Discretionary', desc: 'Lifestyle choices, flexible' },
-];
+
 
 export const LiabilityForm: React.FC<LiabilityFormProps> = ({
   initialData,
@@ -48,7 +40,7 @@ export const LiabilityForm: React.FC<LiabilityFormProps> = ({
 
   const [name, setName] = useState(initialData?.name || '');
   const [type, setType] = useState<LiabilityType>(initialData?.type || 'credit_card');
-  const [expenseClass, setExpenseClass] = useState<ExpenseClassification>(initialData?.expenseClass || 'fixed');
+
   const [currentBalance, setCurrentBalance] = useState(initialData?.currentBalance?.toString() || '');
   const [monthlyPayment, setMonthlyPayment] = useState(initialData?.monthlyPayment?.toString() || '');
   const [interestRate, setInterestRate] = useState(initialData?.interestRate?.toString() || '');
@@ -66,7 +58,6 @@ export const LiabilityForm: React.FC<LiabilityFormProps> = ({
       id: initialData?.id || crypto.randomUUID(),
       name: name.trim(),
       type,
-      expenseClass,
       currentBalance: parseFloat(currentBalance) || 0,
       monthlyPayment: parseFloat(monthlyPayment) || 0,
       interestRate: parseFloat(interestRate) || 0,
@@ -148,29 +139,7 @@ export const LiabilityForm: React.FC<LiabilityFormProps> = ({
           </div>
         </div>
 
-        {/* Expense Classification */}
-        <div>
-          <label className="text-xs font-bold text-neutral-400 uppercase tracking-wider mb-2 block">
-            {t('cashflow.expenseClass') || 'Expense Classification'}
-          </label>
-          <div className="grid grid-cols-2 gap-2">
-            {EXPENSE_CLASSES.map(ec => (
-              <button
-                key={ec.value}
-                type="button"
-                onClick={() => setExpenseClass(ec.value)}
-                className={`px-3 py-2.5 rounded-xl text-left transition-all border ${
-                  expenseClass === ec.value
-                    ? 'bg-gold-500/10 border-gold-500/30'
-                    : 'bg-neutral-900 border-neutral-800 hover:border-neutral-700'
-                }`}
-              >
-                <span className={`text-xs font-bold ${expenseClass === ec.value ? 'text-gold-500' : 'text-white'}`}>{ec.label}</span>
-                <p className="text-[9px] text-neutral-500 mt-0.5">{ec.desc}</p>
-              </button>
-            ))}
-          </div>
-        </div>
+
 
         {/* Financial Details Grid */}
         <div className="grid grid-cols-2 gap-4">

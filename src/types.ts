@@ -211,43 +211,6 @@ export interface ChartDataPoint {
 
 // --- CASH FLOW TYPES ---
 
-export type AssetClassification = 'productive' | 'defensive' | 'consumption' | 'intangible';
-
-export type AssetCategory =
-  | 'liquid_cash'
-  | 'liquid_bank_account'
-  | 'liquid_savings'
-  | 'financial_long_term'
-  | 'financial_investment'
-  | 'real_housing'
-  | 'real_property'
-  | 'real_vehicle'
-  | 'real_equipment'
-  | 'real_jewelry'
-  | 'business_equity'
-  | 'business_inventory'
-  | 'business_machinery'
-  | 'business_other'
-  | 'other_convertible';
-
-export type AssetType = 'liquid' | 'financial' | 'real_physical' | 'business' | 'other';
-
-export interface PersonalAsset {
-  id: string;
-  name: string;
-  type: AssetType;
-  category: AssetCategory;
-  classification: AssetClassification;
-  estimatedValue: number;
-  currency: string;
-  acquisitionDate?: string;
-  monthlyIncome?: number;
-  depreciationRateAnnual?: number;
-  notes?: string;
-  linkedAccountId?: string;
-  lastValuationDate?: string;
-}
-
 export type LiabilityType =
   | 'credit_card'
   | 'personal_loan'
@@ -261,20 +224,10 @@ export type LiabilityType =
   | 'tax_debt'
   | 'other';
 
-export type ExpenseClassification =
-  | 'fixed'
-  | 'variable'
-  | 'semi_fixed'
-  | 'operational'
-  | 'non_operational'
-  | 'unnecessary'
-  | 'discretionary';
-
 export interface PersonalLiability {
   id: string;
   name: string;
   type: LiabilityType;
-  expenseClass: ExpenseClassification;
   currentBalance: number;
   monthlyPayment: number;
   interestRate: number;
@@ -286,33 +239,61 @@ export interface PersonalLiability {
   notes?: string;
 }
 
+export interface InferredAsset {
+  name: string;
+  type: 'vehicle' | 'property' | 'education';
+  value: number;
+  sourceType: 'liability';
+  sourceId: string;
+  icon: string; // Lucide icon name
+}
+
+export interface RealAccountAsset {
+  id: string;
+  name: string;
+  institution: string;
+  balance: number;
+  currency: string;
+  accountType: string;
+}
+
+export interface RealInvestmentAsset {
+  id: string;
+  name: string;
+  ticker?: string;
+  currentValue: number;
+  currency: string;
+  investmentType: string;
+}
+
 export interface CashFlowMetrics {
-  totalAssets: number;
-  totalLiabilities: number;
-  netWorth: number;
-
-  liquidAssets: number;
-  financialAssets: number;
-  realAssets: number;
-  businessAssets: number;
-  otherAssets: number;
-
-  productiveAssets: number;
-  defensiveAssets: number;
-  consumptionAssets: number;
-  intangibleAssets: number;
-
+  // Monthly Dashboard
   monthlyNetIncome: number;
   monthlyTotalExpenses: number;
   monthlyCashFlow: number;
-  monthlyUtility: number;
   monthlySavingsInvestment: number;
   monthlyDebtPayments: number;
 
+  // Key Indicators
   savingsRate: number;
   savingsRateStatus: 'alarm' | 'solid' | 'acceleration';
   dti: number;
   dtiStatus: 'high_pressure' | 'acceptable' | 'room';
   liquidityMonths: number;
   liquidityStatus: 'critical' | 'high_risk' | 'healthy' | 'solid' | 'ultra_defensive';
+
+  // Asset Breakdown (from real data)
+  liquidAssets: number;
+  liquidAccountsList: RealAccountAsset[];
+  financialAssets: number;
+  financialAccountsList: RealAccountAsset[];
+  financialInvestmentsList: RealInvestmentAsset[];
+  businessAssets: number;
+  businessAccountsList: RealAccountAsset[];
+  inferredPhysicalAssets: InferredAsset[];
+
+  // Totals
+  totalAssets: number;
+  totalLiabilities: number;
+  netWorth: number;
 }
